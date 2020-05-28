@@ -1,0 +1,15 @@
+[package]
+name = "lucent"
+version = "0.1.0"
+authors = ["Technocoder <8334328+Techno-coder@users.noreply.github.com>"]
+edition = "2018"
+
+[dependencies]
+tree-sitter = "^0.16"
+parking_lot = "^0.10"
+codespan-reporting = "^0.9"
+codespan = "^0.9"
+dashmap = "^3.0"
+
+[build-dependencies]
+cc = "*"

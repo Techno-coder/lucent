@@ -1,0 +1,195 @@
+=====================================
+Comments
+=====================================
+
+fn function() // truth
+	// true
+	true
+
+---
+
+(source (function (identifier)
+	(block (truth))))
+
+=====================================
+Functions
+=====================================
+
+fn function(first: type, second: type) truth
+	true
+
+---
+
+(source
+	item: (function
+		identifier: (identifier)
+		parameter: (parameter
+			identifier: (identifier)
+			type: (path (identifier)))
+		parameter: (parameter
+			identifier: (identifier)
+			type: (path (identifier)))
+		return: (path (identifier))
+		block: (block (truth))))
+
+=====================================
+Void functions
+=====================================
+
+fn function(parameter: type)
+	true
+
+---
+
+(source
+	item: (function
+		identifier: (identifier)
+		parameter: (parameter
+			identifier: (identifier)
+			type: (path (identifier)))
+		block: (block (truth))))
+
+=====================================
+Expression functions
+=====================================
+
+fn function() truth = true
+
+---
+
+(source
+	item: (function
+		identifier: (identifier)
+		return: (path (identifier))
+		block: (block (truth))))
+
+=====================================
+Calling conventions
+=====================================
+
+cdecl fn function() truth = true
+
+---
+
+(source
+	item: (function
+		convention: (identifier)
+		identifier: (identifier)
+		return: (path (identifier))
+		block: (block (truth))))
+
+=====================================
+Root functions
+=====================================
+
+root fn function() truth = true
+
+---
+
+(source
+	item: (function
+		root: (root)
+		identifier: (identifier)
+		return: (path (identifier))
+		block: (block (truth))))
+
+=====================================
+Static variables
+=====================================
+
+static identifier: truth = true
+static identifier: truth
+static identifier = true
+
+---
+
+(source
+	item: (static
+		identifier: (identifier)
+		type: (path (identifier))
+		value: (truth))
+	item: (static
+		identifier: (identifier)
+		type: (path (identifier)))
+	item: (static
+		identifier: (identifier)
+		value: (truth)))
+
+=====================================
+Modules
+=====================================
+
+module Module
+	module Module
+		fn function()
+			true
+
+	static variable: truth
+
+---
+
+(source
+	(module (identifier)
+		(module (identifier)
+			(function (identifier) (block (truth))))
+		(static (identifier) (path (identifier)))))
+
+=====================================
+Structures
+=====================================
+
+data Structure
+	field: truth
+	other: truth
+
+---
+
+(source (data (identifier)
+	(field (identifier) (path (identifier)))
+	(field (identifier) (path (identifier)))))
+
+=====================================
+Annotations
+=====================================
+
+@annotation parameter
+module Module
+	static variable: truth
+
+@@annotation parameter
+
+---
+
+(source
+	(module (annotation (identifier) (path (identifier)))
+		(identifier) (static (identifier) (path (identifier))))
+	(global_annotation (identifier) (path (identifier))))
+
+=====================================
+Imports
+=====================================
+
+use "path"
+use "path" with "path"
+use "path" as identifier
+use identifier.function as fn function(type) type
+use identifier.0x0000 as convention fn()
+use identifier.symbol as variable: type
+use identifier.*
+use identifier
+
+---
+
+(source
+	(use (string))
+	(use (string) (string))
+	(use (string) (identifier))
+	(use (path (identifier) (identifier))
+		(signature (identifier) (path (identifier))
+			(path (identifier))))
+	(use (path (identifier) (integral))
+		(signature (identifier)))
+	(use (path (identifier) (identifier))
+		(static (identifier) (path (identifier))))
+	(use (path (identifier) (wild)))
+	(use (path (identifier))))

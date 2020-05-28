@@ -1,0 +1,15 @@
+module Module
+	static A: u64
+
+	module Module
+		fn test() = true
+
+		use "a.so" as Library
+		use "a.so" as Library
+
+		use Library.test as variable: u32
+		use Library.test as variable: u16
+
+		use "vector.lc" as Vector
+
+

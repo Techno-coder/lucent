@@ -1,0 +1,274 @@
+=====================================
+Literals
+=====================================
+
+fn function()
+	0
+	0x0
+	0o0
+	0x0'0
+	"string"
+	"\"string\""
+	$register
+	true
+	'a'
+
+---
+
+(source (function
+	(identifier) (block
+		(integral) (integral) (integral) (integral)
+		(string) (string) (register) (truth) (rune))))
+
+=====================================
+Let statements
+=====================================
+
+fn function()
+	let identifier: type = value
+	let identifier = value
+	let identifier: type
+	let identifier
+
+---
+
+(source item: (function
+	identifier: (identifier)
+	block: (block
+		(let identifier: (identifier)
+			type: (path (identifier))
+			value: (path (identifier)))
+		(let identifier: (identifier)
+			value: (path (identifier)))
+		(let identifier: (identifier)
+			type: (path (identifier)))
+		(let identifier: (identifier)))))
+
+=====================================
+Binary expressions
+=====================================
+
+fn function()
+	1 + 1
+	1 - 1 * 1
+	1 + (1 - 1)
+	1 + 1 / 1 % 1
+
+---
+
+(source (function
+	(identifier) (block
+		(binary (integral) (integral))
+		(binary (integral) (binary (integral) (integral)))
+		(binary (integral) (binary (integral) (integral)))
+		(binary (integral) (binary (binary
+			(integral) (integral)) (integral))))))
+
+=====================================
+Unary expressions
+=====================================
+
+fn function()
+	-1 + *&identifier
+	!true
+
+---
+
+(source (function
+	(identifier) (block
+		(binary (unary (integral))
+			(unary (unary (path (identifier)))))
+		(unary (truth)))))
+
+=====================================
+Cast expressions
+=====================================
+
+fn function()
+	1 as truth
+	1 as i32 as truth
+
+---
+
+(source (function
+	(identifier) (block
+		(cast (integral) (path (identifier)))
+		(cast (cast (integral) (path (identifier)))
+			(path (identifier))))))
+
+=====================================
+Function calls
+=====================================
+
+fn function()
+	function()
+	let value = function()
+	function(1, true, function())
+
+---
+
+(source item: (function
+	identifier: (identifier) block: (block
+		(call function: (path (identifier))
+			arguments: (arguments))
+		(let identifier: (identifier)
+			value: (call function: (path (identifier))
+				arguments: (arguments)))
+		(call function: (path (identifier))
+			arguments: (arguments (integral) (truth)
+				(call function: (path (identifier))
+					arguments: (arguments)))))))
+
+=====================================
+Function returns
+=====================================
+
+fn function()
+	return identifier
+	return
+
+---
+
+(source (function
+	(identifier) (block
+		(return (path (identifier)))
+		(return))))
+
+=====================================
+Arrays
+=====================================
+
+fn function()
+	let variable: [u8; 3] = [1, 2, 3]
+	variable[0]
+
+---
+
+(source (function
+	(identifier) (block
+		(let (identifier)
+			(array_type (path (identifier)) (integral))
+			(array (integral) (integral) (integral)))
+		(index (path (identifier)) (integral)))))
+
+=====================================
+Slices
+=====================================
+
+fn function()
+	let variable: [u8;] = [][0:0]
+	variable[:]
+
+---
+
+(source (function
+	(identifier) (block
+		(let (identifier)
+			(slice_type (path (identifier)))
+			(slice (array) (integral) (integral)))
+		(slice (path (identifier))))))
+
+=====================================
+Pointers
+=====================================
+
+fn function()
+	let variable: **u8 = 0 as *u8 as **u8
+	**variable
+
+---
+
+(source (function
+	(identifier) (block
+		(let (identifier)
+			(pointer (pointer (path (identifier))))
+			(cast (cast (integral)
+				(pointer (path (identifier))))
+				(pointer (pointer (path (identifier))))))
+		(unary (unary (path (identifier)))))))
+
+=====================================
+When expressions
+=====================================
+
+fn function()
+	let variable = when:
+		false: 0
+		true: 1
+	when true:
+		true
+
+---
+
+(source (function
+	(identifier) (block
+		(let (identifier) (when
+			(branch (truth) (block (integral)))
+			(branch (truth) (block (integral)))))
+		(when (branch (truth) (block (truth)))))))
+
+=====================================
+While loops
+=====================================
+
+fn function()
+	while true: true
+	while true:
+		break
+
+---
+
+(source (function
+	(identifier) (block
+		(while (truth) (block (truth)))
+		(while (truth) (block (break))))))
+
+=====================================
+Construction
+=====================================
+
+fn function()
+	Structure: field = true, field
+
+---
+
+(source (function
+	(identifier) (block
+		(create (path (identifier))
+			(field (identifier) (truth))
+			(identifier)))))
+
+=====================================
+Fields
+=====================================
+
+fn function()
+	identifier.field
+	(identifier).field
+	(identifier).field.field
+
+---
+
+(source (function
+	(identifier) (block
+		(path (identifier) (identifier))
+		(access (path (identifier)) (identifier))
+		(access (access (path (identifier)) (identifier))
+			(identifier)))))
+
+=====================================
+Assignment
+=====================================
+
+fn function()
+	identifier = true
+	*identifier() =
+		true
+
+---
+
+(source (function
+	(identifier) (block
+		(set (path (identifier)) (truth))
+		(set (unary (call (path (identifier))
+			(arguments))) (block (truth))))))

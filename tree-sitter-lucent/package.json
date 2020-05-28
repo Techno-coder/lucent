@@ -1,0 +1,12 @@
+{
+  "name": "tree-sitter-lucent",
+  "version": "0.1.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "nan": "^2.14.1"
+  },
+  "devDependencies": {
+    "tree-sitter-cli": "^0.16.7"
+  }
+}
