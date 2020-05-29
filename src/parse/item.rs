@@ -1,5 +1,5 @@
 use codespan::FileId;
-use tree_sitter::{Language, Node, Parser};
+use tree_sitter::{Language, Node, Parser, Query};
 
 use crate::context::Context;
 use crate::node::{Annotation, Identifier, Path};
@@ -23,17 +23,13 @@ pub fn parser() -> Parser {
 	parser
 }
 
-pub fn parse(context: &Context) {
-	let mut parser = parser();
+pub fn errors() -> Query {
+	let language = unsafe { tree_sitter_lucent() };
+	Query::new(language, "(ERROR) @error").unwrap()
+}
 
-	// TODO: Get source from file
-	let source = r#"
-module Module
-	static item: A
-    "#;
-
-	let tree = parser.parse(source, None).unwrap();
-	println!("{:#?}", tree.root_node().to_sexp());
+pub fn parse(context: &Context, path: &std::path::Path) {
+	let symbols = Symbols::root(context, path);
 }
 
 fn module(context: &Context, symbols: &mut Symbols,

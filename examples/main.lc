@@ -5,11 +5,5 @@ module Module
 		fn test() = true
 
 		use "a.so" as Library
-		use "a.so" as Library
-
 		use Library.test as variable: u32
-		use Library.test as variable: u16
-
-		use "vector.lc" as Vector
-
-
+//		use "vector.lc" as Vector

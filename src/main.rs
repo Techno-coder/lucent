@@ -2,6 +2,7 @@
 
 mod error;
 mod context;
+mod arena;
 mod query;
 mod parse;
 mod node;
@@ -14,11 +15,10 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 	let string = "examples/main.lc".to_string();
 	let path = std::path::PathBuf::from(string);
 	let symbols = parse::Symbols::root(context, &path);
-	println!("{:#?}", symbols);
 
 	if let Err(query::QueryError::Cycle(spans)) = symbols {
 		let mut diagnostic = error::Diagnostic::error()
-			.message("cycle occurred at compilation");
+			.message("compilation cycle");
 		for (_, span) in spans.iter().rev() {
 			if let Some(span) = span {
 				diagnostic = diagnostic.label(span.other()
@@ -27,6 +27,8 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 		}
 
 		context.emit(diagnostic);
+	} else {
+		println!("{:#?}", symbols.unwrap().items);
 	}
 
 	context::display(context)?;

@@ -286,7 +286,7 @@ data identifier
 ```
 Structures are constructed by initialization:
 ```
-identifier field.0 = value.0, field.1 = value.1, ...
+identifier: field.0 = value.0, field.1 = value.1, ...
 ```
 If there are variables in scope with the same name as the field then the assignment can be omitted:
 ```

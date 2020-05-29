@@ -1,13 +1,15 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
 
-use tree_sitter::Node;
+use tree_sitter::{Node, Query, QueryCursor, Tree};
 
+use crate::arena::OwnedArena;
 use crate::context::Context;
 use crate::error::Diagnostic;
 use crate::node::{Identifier, Path};
 use crate::query::Key;
 use crate::span::{S, Span};
+
+use super::Source;
 
 type Table = HashMap<Path, S<SymbolKind>>;
 
@@ -19,20 +21,22 @@ pub enum SymbolKind {
 	Library,
 }
 
-#[derive(Debug)]
-pub struct Symbols {
+pub struct Symbols<'a> {
 	stack: Vec<Table>,
+	trees: OwnedArena<'a, Tree>,
+	pub items: Vec<(Path, Node<'a>)>,
 }
 
-impl Symbols {
-	pub fn root(context: &Context, path: &std::path::Path) -> crate::Result<Symbols> {
-		let mut table = HashMap::new();
-		file(context, &mut table, path, &Path::default(), None)?;
-		Ok(Symbols { stack: vec![table] })
+impl<'a> Symbols<'a> {
+	pub fn root(context: &Context, path: &std::path::Path) -> crate::Result<Self> {
+		let (trees, items) = (OwnedArena::default(), Vec::new());
+		let mut symbols = Symbols { stack: vec![Table::new()], trees, items };
+		file(context, &mut symbols, path, &Path::default(), None)?;
+		Ok(symbols)
 	}
 }
 
-fn file(context: &Context, table: &mut Table, file: &std::path::Path,
+fn file(context: &Context, symbols: &mut Symbols, file: &std::path::Path,
 		path: &Path, span: Option<Span>) -> crate::Result<()> {
 	let canonical = file.canonicalize().ok();
 	let (source, text) = {
@@ -60,64 +64,86 @@ fn file(context: &Context, table: &mut Table, file: &std::path::Path,
 		let file = file.parent().unwrap();
 		let source = super::Source { file: source, path: file, text: &text };
 		let tree = super::parser().parse(text.as_bytes(), None).unwrap();
-		traverse(context, table, &source, path, tree.root_node())
+		let root_node = symbols.trees.push(tree).root_node();
+		traverse(context, symbols, &source, path, root_node)
 	}).map(std::mem::drop)
 }
 
-fn traverse(context: &Context, table: &mut Table, source: &super::Source,
-			path: &Path, node: Node) -> crate::Result<()> {
-	let cursor = &mut node.walk();
-	let mut nodes = node.children_by_field_name("item", cursor);
-	nodes.try_for_each(|node| Ok(match node.kind() {
-		"module" => traverse(context, table, source, &path
+fn traverse<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
+				path: &Path, node: Node<'a>) -> crate::Result<()> {
+	let (cursor, errors) = (&mut node.walk(), &super::errors());
+	let mut nodes = node.named_children(cursor);
+	nodes.try_for_each(|node: Node| Ok(match node.kind() {
+		"ERROR" => syntax_error(context, source, node),
+		"module" => traverse(context, symbols, source, &path
 			.push(super::field_identifier(source, node).node), node)?,
-		"function" => function(context, table, path,
+		_ if !valid(context, source, errors, node) => (),
+		"function" => function(context, symbols, path, node,
 			super::field_identifier(source, node)),
-		"use" => {
-			let node_path = node.child_by_field_name("path").unwrap();
-			match node_path.kind() {
-				"string" => {
-					let other = super::string(source, node_path);
-					let file = &source.path.join(other.node);
-					let extension = file.extension()
-						.and_then(std::ffi::OsStr::to_str);
-					let path_as = node.child_by_field_name("as")
-						.map(|node| super::identifier(source, node));
-
-					if extension == Some("lc") {
-						let path = path_as.map(|node| path.push(node.node))
-							.unwrap_or_else(|| path.clone());
-						self::file(context, table, file,
-							&path, Some(other.span))?;
-					} else if let Some(identifier) = path_as {
-						duplicate(context, table, path,
-							SymbolKind::Library, identifier);
-					}
-				}
-				"path" => {
-					let node = node.child_by_field_name("as");
-					node.into_iter().for_each(|node| match node.kind() {
-						"signature" => node.child_by_field_name("identifier")
-							.into_iter().for_each(|node| function(context, table,
-							path, super::identifier(source, node))),
-						"static" => duplicate(context, table, path, SymbolKind::Variable,
-							super::field_identifier(source, node)),
-						_ => (),
-					})
-				}
-				_ => (),
-			}
-		}
-		"static" => duplicate(context, table, path,
+		"static" => duplicate(context, symbols, path, node,
 			SymbolKind::Variable, super::field_identifier(source, node)),
-		"data" => duplicate(context, table, path,
+		"data" => duplicate(context, symbols, path, node,
 			SymbolKind::Structure, super::field_identifier(source, node)),
+		"use" => import(context, symbols, source, path, node)?,
 		_ => (),
 	}))
 }
 
-fn function(context: &Context, table: &mut Table,
-			path: &Path, identifier: S<Identifier>) {
+fn valid(context: &Context, source: &super::Source,
+		 errors: &Query, node: Node) -> bool {
+	let mut error_cursor = QueryCursor::new();
+	let mut captures = error_cursor.captures(errors, node,
+		|node| &source.text[node.byte_range()]);
+	captures.flat_map(|(capture, _)| capture.captures)
+		.map(|capture| syntax_error(context, source, capture.node))
+		.last().is_none()
+}
+
+fn syntax_error(context: &Context, source: &Source, node: Node) {
+	let label = Span::new(node.byte_range(), source.file).label();
+	context.emit(Diagnostic::error().message("syntax error").label(label));
+}
+
+fn import<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
+			  path: &Path, node: Node<'a>) -> crate::Result<()> {
+	let node_path = node.child_by_field_name("path").unwrap();
+	Ok(match node_path.kind() {
+		"string" => {
+			let other = super::string(source, node_path);
+			let file = &source.path.join(other.node);
+			let extension = file.extension()
+				.and_then(std::ffi::OsStr::to_str);
+			let path_as = node.child_by_field_name("as")
+				.map(|node| super::identifier(source, node));
+
+			if extension == Some("lc") {
+				let path = path_as.map(|node| path.push(node.node))
+					.unwrap_or_else(|| path.clone());
+				self::file(context, symbols, file,
+					&path, Some(other.span))?;
+			} else if let Some(identifier) = path_as {
+				duplicate(context, symbols, path, node,
+					SymbolKind::Library, identifier);
+			}
+		}
+		"path" => {
+			let node_as = node.child_by_field_name("as");
+			node_as.into_iter().for_each(|node_as| match node_as.kind() {
+				"signature" => node_as.child_by_field_name("identifier")
+					.into_iter().for_each(|node_as| function(context, symbols,
+					path, node, super::identifier(source, node_as))),
+				"static" => duplicate(context, symbols, path, node,
+					SymbolKind::Variable, super::field_identifier(source, node_as)),
+				_ => (),
+			})
+		}
+		_ => (),
+	})
+}
+
+fn function<'a>(context: &Context, symbols: &mut Symbols<'a>,
+				path: &Path, node: Node<'a>, identifier: S<Identifier>) {
+	let table = symbols.stack.first_mut().unwrap();
 	let path = path.push(identifier.node);
 	if let Some(other) = table.get(&path) {
 		if other.node != SymbolKind::Function {
@@ -127,17 +153,21 @@ fn function(context: &Context, table: &mut Table,
 				.label(other.span.label()));
 		}
 	} else {
+		symbols.items.push((path.clone(), node));
 		let symbol = S::new(SymbolKind::Function, identifier.span);
 		table.insert(path, symbol);
 	}
 }
 
-fn duplicate(context: &Context, table: &mut Table, path: &Path,
-			 symbol: SymbolKind, identifier: S<Identifier>) {
+fn duplicate<'a>(context: &Context, symbols: &mut Symbols<'a>, path: &Path,
+				 node: Node<'a>, symbol: SymbolKind, identifier: S<Identifier>) {
+	let table = symbols.stack.first_mut().unwrap();
 	let path = path.push(identifier.node);
 	match table.get(&path) {
-		None => table.insert(path, S::new(symbol,
-			identifier.span)).unwrap_none(),
+		None => {
+			symbols.items.push((path.clone(), node));
+			table.insert(path, S::new(symbol, identifier.span));
+		}
 		Some(other) => {
 			context.emit(Diagnostic::error()
 				.message("duplicate symbol")

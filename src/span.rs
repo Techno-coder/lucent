@@ -11,6 +11,11 @@ pub struct Span {
 }
 
 impl Span {
+	pub fn new(range: Range<usize>, file: codespan::FileId) -> Self {
+		let range = range.start as u32..range.end as u32;
+		Span { span: range.into(), file }
+	}
+
 	pub fn label(&self) -> Label<FileId> {
 		Label::primary(self.file, self.span)
 	}
@@ -32,8 +37,7 @@ impl<T> S<T> {
 	}
 
 	pub fn create(node: T, range: Range<usize>, file: codespan::FileId) -> Self {
-		let range = range.start as u32..range.end as u32;
-		S { node, span: Span { span: range.into(), file } }
+		S { node, span: Span::new(range, file) }
 	}
 }
 
