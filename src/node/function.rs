@@ -4,75 +4,79 @@ use crate::span::S;
 
 use super::{Identifier, Path};
 
-pub type ExpressionIndex = usize;
+pub type ValueIndex = usize;
 
-#[derive(Debug)]
-pub struct Function {
-	pub is_root: S<bool>,
-	pub convention: S<Identifier>,
-	pub annotations: Vec<super::Annotation>,
-	pub parameters: Vec<Parameter>,
-	pub return_type: S<Type>,
-	pub expression: Expression,
+#[derive(Debug, Default, Clone)]
+pub struct Value {
+	pub root: ValueIndex,
+	values: Vec<S<ValueNode>>,
 }
 
-#[derive(Debug)]
-pub enum Parameter {
-	Register(S<Identifier>),
-	Variable(S<Identifier>, S<Type>),
-}
-
-#[derive(Debug)]
-pub struct Expression {
-	pub root: ExpressionIndex,
-	expressions: Vec<S<ExpressionNode>>,
-}
-
-impl Index<ExpressionIndex> for Expression {
-	type Output = S<ExpressionNode>;
-
-	fn index(&self, index: usize) -> &Self::Output {
-		self.expressions.get(index).unwrap_or_else(||
-			panic!("Expression index: {}, is invalid", index))
+impl Value {
+	pub fn insert(&mut self, node: S<ValueNode>) -> ValueIndex {
+		let index = self.values.len();
+		self.values.push(node);
+		index
 	}
 }
 
-#[derive(Debug)]
-pub enum ExpressionNode {
-	Let(S<Identifier>, Option<S<Type>>, ExpressionIndex),
-	Set(ExpressionIndex, ExpressionIndex),
-	While(ExpressionIndex, ExpressionIndex),
-	When(Vec<(ExpressionIndex, ExpressionIndex)>),
-	Cast(ExpressionIndex, S<Type>),
-	Return(Option<ExpressionIndex>),
-	Compile(ExpressionIndex),
-	Inline(ExpressionIndex),
-	Call(S<Path>, Vec<ExpressionIndex>),
-	Binary(Binary, ExpressionIndex, ExpressionIndex),
-	Unary(Unary, ExpressionIndex),
+impl Index<ValueIndex> for Value {
+	type Output = S<ValueNode>;
+
+	fn index(&self, index: usize) -> &Self::Output {
+		self.values.get(index).unwrap_or_else(||
+			panic!("Value index: {}, is invalid", index))
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct Variable(pub Identifier, pub u16);
+
+#[derive(Debug, Clone)]
+pub enum ValueNode {
+	Block(Vec<ValueIndex>),
+	Let(S<Variable>, Option<S<Type>>, Option<ValueIndex>),
+	Set(ValueIndex, ValueIndex),
+	While(ValueIndex, ValueIndex),
+	When(Vec<(ValueIndex, ValueIndex)>),
+	Cast(ValueIndex, S<Type>),
+	Return(Option<ValueIndex>),
+	Compile(ValueIndex),
+	Inline(ValueIndex),
+	Call(S<Path>, Vec<ValueIndex>),
+	Field(ValueIndex, S<Identifier>),
+	Create(S<Path>, Vec<(S<Identifier>, ValueIndex)>),
+	Slice(ValueIndex, Option<ValueIndex>, Option<ValueIndex>),
+	Index(ValueIndex, ValueIndex),
+	Compound(Dual, ValueIndex, ValueIndex),
+	Binary(Binary, ValueIndex, ValueIndex),
+	Unary(Unary, ValueIndex),
+	Variable(Variable),
 	Path(Path),
 	String(String),
 	Register(Identifier),
+	Array(Vec<ValueIndex>),
 	Integral(i128),
 	Truth(bool),
 	Rune(char),
 	Break,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Type {
 	Void,
 	Rune,
-	String,
 	Truth,
 	Never,
+	Structure(Path),
 	Signed(IntegralSize),
 	Unsigned(IntegralSize),
 	Pointer(Box<S<Type>>),
-	Array(Box<S<Type>>, ExpressionIndex),
+	Array(Box<S<Type>>, Value),
+	Slice(Box<S<Type>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum IntegralSize {
 	Byte,
 	Word,
@@ -80,16 +84,9 @@ pub enum IntegralSize {
 	Quad,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Binary {
-	Add,
-	Minus,
-	Multiply,
-	Divide,
-	Modulo,
-	BinaryOr,
-	BinaryAnd,
-	ExclusiveOr,
+	Dual(Dual),
 	Less,
 	Greater,
 	LessEqual,
@@ -98,11 +95,57 @@ pub enum Binary {
 	Equal,
 	And,
 	Or,
+}
+
+impl Binary {
+	pub fn parse(string: &str) -> Option<Binary> {
+		Some(match string {
+			"&&" => Binary::And,
+			"||" => Binary::Or,
+			"==" => Binary::Equal,
+			"!=" => Binary::NotEqual,
+			"<" => Binary::Less,
+			">" => Binary::Greater,
+			"<=" => Binary::LessEqual,
+			">=" => Binary::GreaterEqual,
+			_ => Binary::Dual(Dual::parse(string)?),
+		})
+	}
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Dual {
+	Add,
+	Minus,
+	Multiply,
+	Divide,
+	Modulo,
+	BinaryOr,
+	BinaryAnd,
+	ExclusiveOr,
 	ShiftLeft,
 	ShiftRight,
 }
 
-#[derive(Debug)]
+impl Dual {
+	pub fn parse(string: &str) -> Option<Dual> {
+		Some(match string {
+			"+" => Dual::Add,
+			"-" => Dual::Minus,
+			"*" => Dual::Multiply,
+			"/" => Dual::Divide,
+			"%" => Dual::Modulo,
+			"&" => Dual::BinaryAnd,
+			"^" => Dual::ExclusiveOr,
+			"|" => Dual::BinaryOr,
+			"<<" => Dual::ShiftLeft,
+			">>" => Dual::ShiftRight,
+			_ => return None,
+		})
+	}
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum Unary {
 	Not,
 	Negate,

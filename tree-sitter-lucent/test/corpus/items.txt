@@ -173,7 +173,7 @@ use "path"
 use "path" with "path"
 use "path" as identifier
 use identifier.function as fn function(type) type
-use identifier.0x0000 as convention fn()
+use identifier.0x0000 as convention fn function()
 use identifier.symbol as variable: type
 use identifier.*
 use identifier
@@ -188,7 +188,7 @@ use identifier
 		(signature (identifier) (path (identifier))
 			(path (identifier))))
 	(use (path (identifier) (integral))
-		(signature (identifier)))
+		(signature (identifier) (identifier)))
 	(use (path (identifier) (identifier))
 		(static (identifier) (path (identifier))))
 	(use (path (identifier) (wild)))

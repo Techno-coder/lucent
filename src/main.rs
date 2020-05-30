@@ -1,4 +1,5 @@
 #![feature(option_unwrap_none)]
+#![feature(never_type)]
 
 mod error;
 mod context;
@@ -11,12 +12,10 @@ mod span;
 type Result<T> = std::result::Result<T, query::QueryError>;
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
+	use query::QueryError;
 	let context = &context::Context::default();
-	let string = "examples/main.lc".to_string();
-	let path = std::path::PathBuf::from(string);
-	let symbols = parse::Symbols::root(context, &path);
-
-	if let Err(query::QueryError::Cycle(spans)) = symbols {
+	let path = std::path::Path::new("examples/main.lc");
+	if let Err(QueryError::Cycle(spans)) = parse::parse(context, path) {
 		let mut diagnostic = error::Diagnostic::error()
 			.message("compilation cycle");
 		for (_, span) in spans.iter().rev() {
@@ -28,7 +27,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 
 		context.emit(diagnostic);
 	} else {
-		println!("{:#?}", symbols.unwrap().items);
+		println!("{:#?}", context);
 	}
 
 	context::display(context)?;

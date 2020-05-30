@@ -11,7 +11,11 @@ use crate::span::{S, Span};
 
 use super::Source;
 
-type Table = HashMap<Path, S<SymbolKind>>;
+pub enum Include {
+	Wild(Path),
+	Item(Path),
+	As(Path, Identifier),
+}
 
 #[derive(Debug, PartialEq)]
 pub enum SymbolKind {
@@ -19,20 +23,73 @@ pub enum SymbolKind {
 	Variable,
 	Structure,
 	Library,
+	Module,
 }
 
+pub enum Item<'a> {
+	Item((Path, Source, Node<'a>)),
+	ModuleEnd,
+}
+
+#[derive(Default)]
 pub struct Symbols<'a> {
-	stack: Vec<Table>,
+	pub items: Vec<Item<'a>>,
+	table: HashMap<Path, S<SymbolKind>>,
+	includes: Vec<Vec<S<Include>>>,
 	trees: OwnedArena<'a, Tree>,
-	pub items: Vec<(Path, Node<'a>)>,
 }
 
 impl<'a> Symbols<'a> {
 	pub fn root(context: &Context, path: &std::path::Path) -> crate::Result<Self> {
-		let (trees, items) = (OwnedArena::default(), Vec::new());
-		let mut symbols = Symbols { stack: vec![Table::new()], trees, items };
+		let mut symbols = Symbols { includes: vec![Vec::new()], ..Symbols::default() };
 		file(context, &mut symbols, path, &Path::default(), None)?;
 		Ok(symbols)
+	}
+
+	pub fn resolve(&self, context: &Context, path: &Path,
+				   span: &Span) -> Option<(Path, &SymbolKind)> {
+		let Path(elements) = path;
+		let mut candidates = self.table.get(path)
+			.map(|kind| ((path.clone(), &kind.node), kind.span.clone()))
+			.into_iter().chain(self.includes.iter().rev()
+			.flat_map(|includes| includes.iter().filter_map(|include| {
+				let path = Path(match &include.node {
+					Include::Wild(Path(other)) => other.iter()
+						.chain(elements.iter()).cloned().collect(),
+					Include::Item(Path(other)) => other.iter()
+						.chain(elements.iter().skip(1)).cloned().collect(),
+					Include::As(Path(other), identifier) if elements.len() == 1
+						&& elements.first() == Some(identifier) => other.clone(),
+					_ => return None,
+				});
+
+				self.table.get(&path).map(|kind|
+					((path, &kind.node), include.span.clone()))
+			}))).peekable();
+
+		let (value, other) = candidates.next()?;
+		match candidates.peek().is_some() {
+			false => Some(value),
+			true => {
+				let diagnostic = Diagnostic::error()
+					.message("ambiguous symbol resolution")
+					.label(span.label()).label(other.other());
+				context.pass(candidates.fold(diagnostic, |diagnostic, (_, other)|
+					diagnostic.label(other.other()))).ok()
+			}
+		}
+	}
+
+	pub fn include(&mut self, include: S<Include>) {
+		self.includes.last_mut().expect("symbol stack is empty").push(include);
+	}
+
+	pub fn push(&mut self) {
+		self.includes.push(Vec::new());
+	}
+
+	pub fn pop(&mut self) {
+		self.includes.pop().expect("symbol stack is empty");
 	}
 }
 
@@ -61,9 +118,9 @@ fn file(context: &Context, symbols: &mut Symbols, file: &std::path::Path,
 
 	let key = Key::SymbolFile(canonical.unwrap());
 	context.symbol_files.scope(None, key, span.clone(), || {
-		let file = file.parent().unwrap();
-		let source = super::Source { file: source, path: file, text: &text };
+		let file = file.parent().unwrap().to_owned();
 		let tree = super::parser().parse(text.as_bytes(), None).unwrap();
+		let source = super::Source { file: source, path: file, text };
 		let root_node = symbols.trees.push(tree).root_node();
 		traverse(context, symbols, &source, path, root_node)
 	}).map(std::mem::drop)
@@ -75,14 +132,29 @@ fn traverse<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
 	let mut nodes = node.named_children(cursor);
 	nodes.try_for_each(|node: Node| Ok(match node.kind() {
 		"ERROR" => syntax_error(context, source, node),
-		"module" => traverse(context, symbols, source, &path
-			.push(super::field_identifier(source, node).node), node)?,
+		"module" => {
+			let element = super::field_identifier(source, node);
+			let path = path.push(element.node.clone());
+			match symbols.table.get(&path) {
+				None | Some(S { node: SymbolKind::Structure, .. }) => {
+					symbols.items.push(Item::Item((path.clone(), source.clone(), node)));
+					let symbol = S::new(SymbolKind::Module, element.span);
+					symbols.table.insert(path.clone(), symbol);
+					traverse(context, symbols, source, &path, node)?;
+					symbols.items.push(Item::ModuleEnd);
+				}
+				Some(other) => context.emit(Diagnostic::error().message("duplicate symbol")
+					.label(element.span.label()).label(other.span.label())),
+			}
+		}
 		_ if !valid(context, source, errors, node) => (),
-		"function" => function(context, symbols, path, node,
-			super::field_identifier(source, node)),
-		"static" => duplicate(context, symbols, path, node,
+		"annotation" => symbols.items
+			.push(Item::Item((path.clone(), source.clone(), node))),
+		"function" => function(context, symbols, source, path,
+			node, super::field_identifier(source, node)),
+		"static" => duplicate(context, symbols, source, path, node,
 			SymbolKind::Variable, super::field_identifier(source, node)),
-		"data" => duplicate(context, symbols, path, node,
+		"data" => duplicate(context, symbols, source, path, node,
 			SymbolKind::Structure, super::field_identifier(source, node)),
 		"use" => import(context, symbols, source, path, node)?,
 		_ => (),
@@ -92,7 +164,7 @@ fn traverse<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
 fn valid(context: &Context, source: &super::Source,
 		 errors: &Query, node: Node) -> bool {
 	let mut error_cursor = QueryCursor::new();
-	let mut captures = error_cursor.captures(errors, node,
+	let captures = error_cursor.captures(errors, node,
 		|node| &source.text[node.byte_range()]);
 	captures.flat_map(|(capture, _)| capture.captures)
 		.map(|capture| syntax_error(context, source, capture.node))
@@ -122,57 +194,49 @@ fn import<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
 				self::file(context, symbols, file,
 					&path, Some(other.span))?;
 			} else if let Some(identifier) = path_as {
-				duplicate(context, symbols, path, node,
-					SymbolKind::Library, identifier);
+				duplicate(context, symbols, source, path,
+					node, SymbolKind::Library, identifier);
 			}
 		}
-		"path" => {
-			let node_as = node.child_by_field_name("as");
-			node_as.into_iter().for_each(|node_as| match node_as.kind() {
-				"signature" => node_as.child_by_field_name("identifier")
+		"path" => match node.child_by_field_name("as") {
+			Some(node_as) if node_as.kind() == "signature" =>
+				node_as.child_by_field_name("identifier")
 					.into_iter().for_each(|node_as| function(context, symbols,
-					path, node, super::identifier(source, node_as))),
-				"static" => duplicate(context, symbols, path, node,
+					source, path, node, super::identifier(source, node_as))),
+			Some(node_as) if node_as.kind() == "static" =>
+				duplicate(context, symbols, source, path, node,
 					SymbolKind::Variable, super::field_identifier(source, node_as)),
-				_ => (),
-			})
-		}
+			_ => symbols.items.push(Item::Item((path.clone(), source.clone(), node))),
+		},
 		_ => (),
 	})
 }
 
-fn function<'a>(context: &Context, symbols: &mut Symbols<'a>,
+fn function<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
 				path: &Path, node: Node<'a>, identifier: S<Identifier>) {
-	let table = symbols.stack.first_mut().unwrap();
 	let path = path.push(identifier.node);
-	if let Some(other) = table.get(&path) {
+	if let Some(other) = symbols.table.get(&path) {
 		if other.node != SymbolKind::Function {
-			context.emit(Diagnostic::error()
-				.message("duplicate symbol")
-				.label(identifier.span.label())
-				.label(other.span.label()));
+			context.emit(Diagnostic::error().message("duplicate symbol")
+				.label(identifier.span.label()).label(other.span.label()));
 		}
 	} else {
-		symbols.items.push((path.clone(), node));
+		symbols.items.push(Item::Item((path.clone(), source.clone(), node)));
 		let symbol = S::new(SymbolKind::Function, identifier.span);
-		table.insert(path, symbol);
+		symbols.table.insert(path, symbol);
 	}
 }
 
-fn duplicate<'a>(context: &Context, symbols: &mut Symbols<'a>, path: &Path,
-				 node: Node<'a>, symbol: SymbolKind, identifier: S<Identifier>) {
-	let table = symbols.stack.first_mut().unwrap();
+fn duplicate<'a>(context: &Context, symbols: &mut Symbols<'a>,
+				 source: &Source, path: &Path, node: Node<'a>,
+				 symbol: SymbolKind, identifier: S<Identifier>) {
 	let path = path.push(identifier.node);
-	match table.get(&path) {
+	match symbols.table.get(&path) {
+		Some(other) => context.emit(Diagnostic::error().message("duplicate symbol")
+			.label(identifier.span.label()).label(other.span.label())),
 		None => {
-			symbols.items.push((path.clone(), node));
-			table.insert(path, S::new(symbol, identifier.span));
-		}
-		Some(other) => {
-			context.emit(Diagnostic::error()
-				.message("duplicate symbol")
-				.label(identifier.span.label())
-				.label(other.span.label()));
+			symbols.items.push(Item::Item((path.clone(), source.clone(), node)));
+			symbols.table.insert(path, S::new(symbol, identifier.span));
 		}
 	}
 }

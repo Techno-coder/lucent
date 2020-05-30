@@ -4,21 +4,30 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use codespan::FileId;
+use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 
 use crate::error::Diagnostic;
-use crate::query::Table;
+use crate::node::{Function, Parameter, Path, Static};
+use crate::query::{QueryError, Table};
 
 #[derive(Debug, Default)]
 pub struct Context {
 	pub files: RwLock<Files>,
 	pub symbol_files: Table<()>,
+	pub statics: DashMap<Path, Static>,
+	pub functions: DashMap<Path, Vec<(Vec<Parameter>, Function)>>,
 	diagnostics: Mutex<Vec<Diagnostic>>,
 }
 
 impl Context {
-	pub fn emit(&self, diagnostic: Diagnostic) {
+	pub fn pass<T>(&self, diagnostic: Diagnostic) -> crate::Result<T> {
 		self.diagnostics.lock().push(diagnostic);
+		Err(QueryError::Failure)
+	}
+
+	pub fn emit(&self, diagnostic: Diagnostic) {
+		let _ = self.pass::<!>(diagnostic);
 	}
 }
 

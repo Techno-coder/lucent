@@ -26,7 +26,7 @@ module Loader
             check_multiboot()
 
         fn check_multiboot()
-            if $eax != 0x36d76289:
+            when $eax != 0x36d76289:
                 no_multiboot(0)
 
         fn no_multiboot(code: u8) never

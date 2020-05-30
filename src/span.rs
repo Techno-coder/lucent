@@ -4,7 +4,7 @@ use std::ops::Range;
 use codespan::FileId;
 use codespan_reporting::diagnostic::Label;
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Span {
 	span: codespan::Span,
 	file: FileId,
@@ -25,7 +25,7 @@ impl Span {
 	}
 }
 
-#[derive(Clone, Hash, Eq, PartialEq)]
+#[derive(Clone)]
 pub struct S<T> {
 	pub span: Span,
 	pub node: T,

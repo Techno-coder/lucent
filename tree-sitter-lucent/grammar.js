@@ -100,10 +100,8 @@ module.exports = grammar({
             seq('(', separated(',', field('parameter',
                 choice($.parameter, $.register))), ')'),
             field('return', optional($._root_type)),
-            field('block', choice(
-                seq('=', $._line_block),
-                $.block,
-            )),
+            choice(field('block', $.block),
+                seq('=', field('block', $._line_block))),
         ),
 
         parameter: $ => seq(
@@ -148,6 +146,7 @@ module.exports = grammar({
         _statement: $ => choice(
             alias('break', $.break),
             $._expression,
+            $.compound,
             $.return,
             $.while,
             $.let,
@@ -171,6 +170,14 @@ module.exports = grammar({
             field('value', $._expression),
         ),
 
+        compound: $ => seq(
+            field('target', $._value),
+            field('operator', choice(
+                choice('+', '-', '*', '/', '%'),
+                choice('&', '|', '^', '<<', '>>'),
+            )), '=', field('value', $._expression),
+        ),
+
         'return': $ => seq('return',
             field('value', optional($._expression))),
 
@@ -186,11 +193,10 @@ module.exports = grammar({
 
         'while': $ => seq('while',
             field('condition', $._value),
-            ':', choice($.block, $._line_block),
+            ':', field('block', choice($.block, $._line_block)),
         ),
 
         _value: $ => prec.right(choice(
-            seq('(', $._value, ')'),
             $.register,
             $.integral,
             $.string,
@@ -205,6 +211,7 @@ module.exports = grammar({
             $.slice,
             $.access,
             $.create,
+            $.group,
             $.path,
         )),
 
@@ -234,10 +241,11 @@ module.exports = grammar({
             ));
         },
 
-        arguments: $ => seq('(', separated(',', $._value), ')'),
         call: $ => prec(PRECEDENCE.call, seq(
-            field('function', $._value),
-            field('arguments', $.arguments),
+            field('function', $.path),
+            seq('(', separated(',',
+                field('argument', $._value)
+            ), ')')
         )),
 
         cast: $ => seq(
@@ -272,13 +280,20 @@ module.exports = grammar({
             field('value', $._value),
         )),
 
+        group: $ => seq('(', $._value, ')'),
         array: $ => seq('[', separated(',', $._value), ']'),
         path: $ => prec.right(seq($.identifier,
             repeat(seq('.', $.identifier)))),
 
+        integral: $ => choice(
+            /0b[0-1]([0-1']*[0-1])?/,
+            /0o[0-7]([0-7']*[0-7])?/,
+            /0x[\da-f]([\da-f']*[\da-f])?/,
+            /\d([\d']*\d)?/,
+        ),
+
         truth: $ => choice('true', 'false'),
         register: $ => seq('$', $._identifier),
-        integral: $ => /(0x|0o|0b)?\d([\d']*\d)?/,
         string: $ => /"(\\.|[^"])*"/,
         rune: $ => /'(\\.|[^"])'/,
 

@@ -5,8 +5,8 @@ Literals
 fn function()
 	0
 	0x0
-	0o0
-	0x0'0
+	0xabc'def
+	0o01234567
 	"string"
 	"\"string\""
 	$register
@@ -60,7 +60,7 @@ fn function()
 	(identifier) (block
 		(binary (integral) (integral))
 		(binary (integral) (binary (integral) (integral)))
-		(binary (integral) (binary (integral) (integral)))
+		(binary (integral) (group (binary (integral) (integral))))
 		(binary (integral) (binary (binary
 			(integral) (integral)) (integral))))))
 
@@ -109,15 +109,12 @@ fn function()
 
 (source item: (function
 	identifier: (identifier) block: (block
-		(call function: (path (identifier))
-			arguments: (arguments))
+		(call function: (path (identifier)))
 		(let identifier: (identifier)
-			value: (call function: (path (identifier))
-				arguments: (arguments)))
+			value: (call function: (path (identifier))))
 		(call function: (path (identifier))
-			arguments: (arguments (integral) (truth)
-				(call function: (path (identifier))
-					arguments: (arguments)))))))
+			argument: (integral) argument: (truth)
+			argument: (call function: (path (identifier)))))))
 
 =====================================
 Function returns
@@ -252,9 +249,9 @@ fn function()
 (source (function
 	(identifier) (block
 		(path (identifier) (identifier))
-		(access (path (identifier)) (identifier))
-		(access (access (path (identifier)) (identifier))
-			(identifier)))))
+		(access (group (path (identifier))) (identifier))
+		(access (access (group (path (identifier)))
+			(identifier)) (identifier)))))
 
 =====================================
 Assignment
@@ -270,5 +267,26 @@ fn function()
 (source (function
 	(identifier) (block
 		(set (path (identifier)) (truth))
-		(set (unary (call (path (identifier))
-			(arguments))) (block (truth))))))
+		(set (unary (call (path (identifier))))
+			(block (truth))))))
+
+=====================================
+Compound assignment
+=====================================
+
+fn function()
+	identifier += 0
+	identifier -= 0
+	identifier %= 0
+	identifier &= 0
+	identifier ^= 0
+
+---
+
+(source (function
+	(identifier) (block
+		(compound (path (identifier)) (integral))
+		(compound (path (identifier)) (integral))
+		(compound (path (identifier)) (integral))
+		(compound (path (identifier)) (integral))
+		(compound (path (identifier)) (integral)))))

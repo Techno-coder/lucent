@@ -1,19 +1,24 @@
+use std::path::PathBuf;
+use std::sync::Arc;
+
 use codespan::FileId;
 use tree_sitter::{Language, Node, Parser, Query};
 
 use crate::context::Context;
-use crate::node::{Annotation, Identifier, Path};
+use crate::error::Diagnostic;
+use crate::node::{Annotation, Identifier, Path, Static};
+use crate::parse::Include;
 use crate::span::S;
 
-use super::Symbols;
+use super::{Item, Symbols};
 
 extern { fn tree_sitter_lucent() -> Language; }
 
 #[derive(Debug, Clone)]
-pub struct Source<'a> {
+pub struct Source {
 	pub file: FileId,
-	pub path: &'a std::path::Path,
-	pub text: &'a str,
+	pub path: PathBuf,
+	pub text: Arc<str>,
 }
 
 pub fn parser() -> Parser {
@@ -28,30 +33,79 @@ pub fn errors() -> Query {
 	Query::new(language, "(ERROR) @error").unwrap()
 }
 
-pub fn parse(context: &Context, path: &std::path::Path) {
-	let symbols = Symbols::root(context, path);
+pub fn parse(context: &Context, path: &std::path::Path) -> crate::Result<()> {
+	let symbols = &mut Symbols::root(context, path)?;
+	let items = std::mem::take(&mut symbols.items);
+	items.iter().map(|item| match item {
+		Item::ModuleEnd => Ok(symbols.pop()),
+		Item::Item((path, source, node)) => self::item(context,
+			symbols, path.clone(), source, *node),
+	}).filter(Result::is_err).last().unwrap_or(Ok(()))
 }
 
-fn module(context: &Context, symbols: &mut Symbols,
-		  source: &Source, path: &Path, node: Node) {
-	let path = path.push(field_identifier(source, node).node);
-	let annotations = annotations(symbols, source, node);
+pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
+			source: &Source, node: Node) -> crate::Result<()> {
+	Ok(match node.kind() {
+		"function" => {
+			let function = super::function(context, symbols, source, node)?;
+			let parameters = function.parameters.iter()
+				.map(|parameter| parameter.node.clone()).collect();
+			context.functions.entry(path).or_default().push((parameters, function));
+		}
+		"static" => {
+			let identifier = field_identifier(source, node);
+			let node_type = node.child_by_field_name("type").map(|node|
+				super::node_type(context, symbols, source, node)).transpose()?;
+			let value = node.child_by_field_name("value").map(|node|
+				super::value(context, symbols, source, node)).transpose()?;
+			let variable = Static { identifier, node_type, value };
+			context.statics.insert(path, variable);
+		}
+		"use" => {
+			let node_as = node.child_by_field_name("as");
+			let S { node: Path(mut elements), span } = self::path(source,
+				node.child_by_field_name("path").unwrap());
 
-	let mut items = Vec::new();
-	let cursor = &mut node.walk();
-	for node in node.children_by_field_name("item", cursor) {
-		items.push(match node.kind() {
-			"function" => super::function(context, symbols, source, &path, node),
-			other => panic!("invalid item type: {}", other),
-		})
-	}
+			symbols.include(S::create(match (elements.last().unwrap(), node_as) {
+				(Identifier(string), Some(_)) if string == "*" => return
+					context.pass(Diagnostic::error().label(span.label())
+						.message("wildcard imports cannot be aliased")),
+				(Identifier(string), None) if string == "*" => {
+					elements.pop();
+					Include::Wild(Path(elements))
+				}
+				(_, Some(node_as)) => Include::As(Path(elements),
+					identifier(source, node_as).node),
+				(_, None) => Include::Item(Path(elements)),
+			}, node.byte_range(), source.file));
+		}
+		"module" => {
+			symbols.push();
+			symbols.include(S::create(Include::Wild(path),
+				node.byte_range(), source.file));
+			// TODO: implement module loading
+		}
+		"annotation" => (), // TODO: implement global annotations
+		other => panic!("invalid item kind: {}", other),
+	})
 }
 
-fn annotations(symbols: &mut Symbols, source: &Source, node: Node) -> Vec<Annotation> {
+pub fn annotations(context: &Context, symbols: &Symbols, source: &Source,
+				   node: Node) -> crate::Result<Vec<Annotation>> {
 	let cursor = &mut node.walk();
-	let _annotations = node.children_by_field_name("annotation", cursor);
-	// TODO
-	Vec::new()
+	node.children_by_field_name("annotation", cursor)
+		.map(|node| Ok(Annotation {
+			name: identifier(source, node),
+			value: super::value(context, symbols, source,
+				node.child_by_field_name("value").unwrap())?,
+		})).collect()
+}
+
+pub fn path(source: &Source, node: Node) -> S<Path> {
+	let cursor = &mut node.walk();
+	S::create(Path(node.named_children(cursor)
+		.map(|node| identifier(source, node).node)
+		.collect()), node.byte_range(), source.file)
 }
 
 pub fn field_identifier(source: &Source, node: Node) -> S<Identifier> {

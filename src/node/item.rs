@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use crate::node::Variable;
 use crate::span::S;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -25,7 +26,7 @@ impl Path {
 	}
 }
 
-impl fmt::Debug for Path {
+impl fmt::Display for Path {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let Path(path) = self;
 		let (last, slice) = path.split_last().unwrap();
@@ -34,10 +35,16 @@ impl fmt::Debug for Path {
 	}
 }
 
+impl fmt::Debug for Path {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self)
+	}
+}
+
 #[derive(Debug)]
 pub struct Annotation {
 	pub name: S<Identifier>,
-	pub value: S<super::Expression>,
+	pub value: super::Value,
 }
 
 #[derive(Debug)]
@@ -50,4 +57,33 @@ pub struct Module {
 pub struct Structure {
 	pub annotations: Vec<Annotation>,
 	pub fields: HashMap<Identifier, S<super::Type>>,
+}
+
+#[derive(Debug)]
+pub struct Static {
+	pub identifier: S<Identifier>,
+	pub node_type: Option<S<super::Type>>,
+	pub value: Option<super::Value>,
+}
+
+#[derive(Debug)]
+pub struct Function {
+	pub is_root: bool,
+	pub convention: Option<S<Identifier>>,
+	pub annotations: Vec<super::Annotation>,
+	pub parameters: Vec<S<Parameter>>,
+	pub return_type: S<ReturnType>,
+	pub value: super::Value,
+}
+
+#[derive(Debug, Clone)]
+pub enum ReturnType {
+	Register(S<Identifier>),
+	Type(S<super::Type>),
+}
+
+#[derive(Debug, Clone)]
+pub enum Parameter {
+	Register(S<Identifier>),
+	Variable(S<Variable>, S<super::Type>),
 }

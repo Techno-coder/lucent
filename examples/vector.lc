@@ -1,4 +1,0 @@
-data Vector
-	size: u64
-
-use "another.lc"
