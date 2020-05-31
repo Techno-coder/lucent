@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -6,7 +7,7 @@ use tree_sitter::{Language, Node, Parser, Query};
 
 use crate::context::Context;
 use crate::error::Diagnostic;
-use crate::node::{Annotation, Identifier, Path, Static};
+use crate::node::{Annotation, Identifier, Path, Static, Structure};
 use crate::parse::Include;
 use crate::span::S;
 
@@ -78,6 +79,24 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 					identifier(source, node_as).node),
 				(_, None) => Include::Item(Path(elements)),
 			}, node.byte_range(), source.file));
+		}
+		"data" => {
+			let cursor = &mut node.walk();
+			let mut fields = HashMap::new();
+			for node in node.children_by_field_name("field", cursor) {
+				let identifier = identifier(source, node);
+				let node_type = super::node_type(context, symbols,
+					source, node.child_by_field_name("type").unwrap())?;
+				match fields.get(&identifier.node) {
+					None => fields.insert(identifier.node, node_type),
+					Some(other) => return context.pass(Diagnostic::error()
+						.label(other.span.label()).label(identifier.span.label())
+						.message("duplicate field")),
+				};
+			}
+
+			let annotations = annotations(context, symbols, source, node)?;
+			context.structures.insert(path, Structure { annotations, fields });
 		}
 		"module" => {
 			symbols.push();

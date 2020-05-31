@@ -48,12 +48,6 @@ pub struct Annotation {
 }
 
 #[derive(Debug)]
-pub struct Module {
-	pub annotations: Vec<Annotation>,
-	pub items: Vec<Path>,
-}
-
-#[derive(Debug)]
 pub struct Structure {
 	pub annotations: Vec<Annotation>,
 	pub fields: HashMap<Identifier, S<super::Type>>,

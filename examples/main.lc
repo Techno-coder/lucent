@@ -2,6 +2,10 @@
 @load 1024 * 1024
 @architecture x86
 module Loader
+	data Tuple
+		a: u32
+		b: u32
+
 	module Header
 		static MAGIC: u32 = 0xe85250d6
 		static ARCHITECTURE: u32 = 0

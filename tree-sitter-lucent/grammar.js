@@ -299,7 +299,7 @@ module.exports = grammar({
 
         identifier: $ => $._identifier,
         _identifier: $ => /[^\x00-@\[-^`{-~][^\x00-&(-/:-@\[-^`{-~]*/,
-        _comment: $ => token(seq('//', /.*/)),
+        _comment: $ => token(seq('//', /[^\n]*/)),
     }
 });
 

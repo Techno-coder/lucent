@@ -8,7 +8,7 @@ use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 
 use crate::error::Diagnostic;
-use crate::node::{Function, Parameter, Path, Static};
+use crate::node::{Function, Parameter, Path, Static, Structure};
 use crate::query::{QueryError, Table};
 
 #[derive(Debug, Default)]
@@ -17,6 +17,7 @@ pub struct Context {
 	pub symbol_files: Table<()>,
 	pub statics: DashMap<Path, Static>,
 	pub functions: DashMap<Path, Vec<(Vec<Parameter>, Function)>>,
+	pub structures: DashMap<Path, Structure>,
 	diagnostics: Mutex<Vec<Diagnostic>>,
 }
 
