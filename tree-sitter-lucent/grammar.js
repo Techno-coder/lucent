@@ -161,8 +161,8 @@ module.exports = grammar({
 
         'let': $ => seq(
             'let', field('identifier', $.identifier),
-            field('type', optional(seq(':', $._type))),
-            field('value', optional(seq('=', $._expression))),
+            optional(seq(':', field('type', $._type))),
+            optional(seq('=', field('value', $._expression))),
         ),
 
         set: $ => seq(

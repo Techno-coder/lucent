@@ -20,9 +20,14 @@ module Loader
 			static Size: u32 = 8
 
 	module Main
+//		root fn start()
+//			$esp = Intrinsic.end(STACK)
+//			check_multiboot()
+
 		root fn start()
-			$esp = Intrinsic.end(STACK)
-			check_multiboot()
+			let value = 0xffff'ffff'ffff'ffff
+			let value: *u32 = &0
+			let value: u16 = *value
 
 		fn check_multiboot()
 			when $eax != 0x36d76289:
@@ -36,3 +41,10 @@ module Loader
 			inline x32.halt()
 
 	static STACK: [u8; 64 * 1024]
+
+module Intrinsic
+	fn end() = true
+	fn size() = true
+
+module x32
+	fn halt() = true

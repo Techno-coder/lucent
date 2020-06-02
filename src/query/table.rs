@@ -12,7 +12,7 @@ pub enum QueryError {
 	Failure,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Table<V> {
 	table: DashMap<Key, (Entry<V>, Vec<Key>)>,
 }
@@ -42,6 +42,25 @@ impl<V> Table<V> {
 			Entry::Failure => Err(QueryError::Failure),
 			Entry::Pending => Err(QueryError::Cycle(vec![(key, span)])),
 		}
+	}
+
+	pub fn ephemeral<F>(&self, parent: Option<Key>, key: Key, span: Option<Span>,
+						function: F) -> Result<Arc<V>, QueryError>
+		where F: FnOnce() -> Result<V, QueryError> {
+		let result = self.scope(parent, key.clone(), span, function);
+		self.invalidate(&key);
+		result
+	}
+
+	pub fn invalidate(&self, key: &Key) {
+		self.table.remove(key).unwrap_or_else(||
+			panic!("key: {:?}, absent from query table", key));
+	}
+}
+
+impl<V> Default for Table<V> {
+	fn default() -> Self {
+		Table { table: DashMap::new() }
 	}
 }
 

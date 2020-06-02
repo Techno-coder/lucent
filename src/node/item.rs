@@ -60,6 +60,8 @@ pub struct Static {
 	pub value: Option<super::Value>,
 }
 
+pub type FunctionKind = usize;
+
 #[derive(Debug)]
 pub struct Function {
 	pub is_root: bool,

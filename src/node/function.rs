@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+use std::fmt;
 use std::ops::Index;
 
-use crate::span::S;
+use crate::context::Context;
+use crate::span::{S, Span};
 
 use super::{Identifier, Path};
 
@@ -25,11 +28,11 @@ impl Index<ValueIndex> for Value {
 
 	fn index(&self, index: usize) -> &Self::Output {
 		self.values.get(index).unwrap_or_else(||
-			panic!("Value index: {}, is invalid", index))
+			panic!("value index: {}, is invalid", index))
 	}
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Variable(pub Identifier, pub u16);
 
 #[derive(Debug, Clone)]
@@ -45,7 +48,7 @@ pub enum ValueNode {
 	Inline(ValueIndex),
 	Call(S<Path>, Vec<ValueIndex>),
 	Field(ValueIndex, S<Identifier>),
-	Create(S<Path>, Vec<(S<Identifier>, ValueIndex)>),
+	Create(S<Path>, HashMap<Identifier, (ValueIndex, Span)>),
 	Slice(ValueIndex, Option<ValueIndex>, Option<ValueIndex>),
 	Index(ValueIndex, ValueIndex),
 	Compound(Dual, ValueIndex, ValueIndex),
@@ -76,12 +79,58 @@ pub enum Type {
 	Slice(Box<S<Type>>),
 }
 
-#[derive(Debug, Copy, Clone)]
+impl Type {
+	pub fn equal(context: &Context, left: &Self, right: &Self) -> bool {
+		use Type::*;
+		match (left, right) {
+			(Void, Void) => true,
+			(Rune, Rune) => true,
+			(Truth, Truth) => true,
+			(Never, Never) => true,
+			(Structure(left), Structure(right)) => left == right,
+			(Signed(left), Signed(right)) => left == right,
+			(Unsigned(left), Unsigned(right)) => left == right,
+			(Pointer(left), Pointer(right)) => Type::equal(context, &left.node, &right.node),
+			// TODO: perform array size evaluations
+			(Array(left, _), Array(right, _)) => Type::equal(context, &left.node, &right.node),
+			(Slice(left), Slice(right)) => Type::equal(context, &left.node, &right.node),
+			_ => false,
+		}
+	}
+}
+
+impl fmt::Display for Type {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Type::Void => write!(f, "void"),
+			Type::Rune => write!(f, "rune"),
+			Type::Truth => write!(f, "truth"),
+			Type::Never => write!(f, "never"),
+			Type::Structure(path) => write!(f, "{}", path),
+			Type::Signed(size) => write!(f, "i{}", size),
+			Type::Unsigned(size) => write!(f, "u{}", size),
+			Type::Pointer(node) => write!(f, "*{}", node),
+			Type::Array(node, value) => match value[value.root].node {
+				ValueNode::Integral(size) => write!(f, "[{}; {}]", node, size),
+				_ => write!(f, "[{}; _]", node),
+			}
+			Type::Slice(node) => write!(f, "[{};]", node),
+		}
+	}
+}
+
+#[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum IntegralSize {
-	Byte,
-	Word,
-	Double,
-	Quad,
+	Byte = 8,
+	Word = 16,
+	Double = 32,
+	Quad = 64,
+}
+
+impl fmt::Display for IntegralSize {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", *self as u8)
+	}
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -113,7 +162,7 @@ impl Binary {
 	}
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Dual {
 	Add,
 	Minus,

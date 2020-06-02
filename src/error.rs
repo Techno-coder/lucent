@@ -20,4 +20,10 @@ impl Diagnostic {
 		diagnostic.labels.push(label);
 		self
 	}
+
+	pub fn note(mut self, note: impl Into<String>) -> Self {
+		let Self(diagnostic) = &mut self;
+		diagnostic.notes.push(note.into());
+		self
+	}
 }

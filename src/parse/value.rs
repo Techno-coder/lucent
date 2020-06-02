@@ -80,6 +80,7 @@ pub fn unit(scene: &mut Scene, node: Node) -> crate::Result<ValueIndex> {
 		}
 		"integral" => {
 			let string = &scene.source.text[node.byte_range()];
+			let string = &string.replace('\'', "");
 			ValueNode::Integral(match string.get(..2) {
 				Some("0x") => i128::from_str_radix(&string[2..], 16),
 				Some("0o") => i128::from_str_radix(&string[2..], 8),
@@ -140,13 +141,14 @@ pub fn unit(scene: &mut Scene, node: Node) -> crate::Result<ValueIndex> {
 			ValueNode::Create(path, fields.map(|field| Ok(match field.kind() {
 				"identifier" => {
 					let identifier = super::identifier(scene.source, field);
-					(identifier.clone(), scene.variable(identifier)?)
+					let variable = scene.variable(identifier.clone())?;
+					(identifier.node, (variable, identifier.span))
 				}
 				"field" => {
 					let name = field.child_by_field_name("name").unwrap();
 					let identifier = super::identifier(scene.source, name);
 					let value = field.child_by_field_name("value").unwrap();
-					(identifier, unit(scene, value)?)
+					(identifier.node, (unit(scene, value)?, identifier.span))
 				}
 				other => panic!("invalid field kind: {}", other)
 			})).collect::<Result<_, _>>()?)
@@ -174,11 +176,20 @@ pub fn unit(scene: &mut Scene, node: Node) -> crate::Result<ValueIndex> {
 		"call" => {
 			let path = node.child_by_field_name("function");
 			let path = super::path(scene.source, path.unwrap());
+			let span = path.span;
 
-			let cursor = &mut node.walk();
-			let arguments = node.children_by_field_name("argument", cursor)
-				.map(|node| unit(scene, node)).collect::<Result<_, _>>()?;
-			ValueNode::Call(path, arguments)
+			match scene.symbols.resolve(scene.context, &path.node, &span) {
+				Some((path, SymbolKind::Function)) => {
+					let cursor = &mut node.walk();
+					let arguments = node.children_by_field_name("argument", cursor)
+						.map(|node| unit(scene, node)).collect::<Result<_, _>>()?;
+					ValueNode::Call(S::new(path, span), arguments)
+				}
+				Some(_) => return scene.context.pass(Diagnostic::error().label(span.label())
+					.message(format!("symbol for path: {}, is not a function", path.node))),
+				None => return scene.context.pass(Diagnostic::error().label(span.label())
+					.message(format!("no function for path: {}", path.node)))
+			}
 		}
 		"cast" => {
 			let value = unit(scene, node.child_by_field_name("value").unwrap())?;

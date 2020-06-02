@@ -1747,13 +1747,9 @@
         ]
       },
       "type": {
-        "multiple": true,
+        "multiple": false,
         "required": false,
         "types": [
-          {
-            "type": ":",
-            "named": false
-          },
           {
             "type": "array_type",
             "named": true
@@ -1773,13 +1769,9 @@
         ]
       },
       "value": {
-        "multiple": true,
+        "multiple": false,
         "required": false,
         "types": [
-          {
-            "type": "=",
-            "named": false
-          },
           {
             "type": "access",
             "named": true

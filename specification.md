@@ -92,7 +92,7 @@ i16
 i32
 i64
 ```
-If the type of an integer is ambiguous then it is assumed to be the smallest signed (or else, unsigned) type that fits the value.
+If the type of an integer is ambiguous then it is assumed to be the smallest signed type that fits the value.
 
 ## Pointer type
 ```
@@ -331,10 +331,10 @@ Binary annotations describe the values that used in the headers of the output bi
 @architecture identifier
 item
 ```
-Architectures specify how intrisic language structures should be translated including call and control flow instructions. This annotation can only be applied to modules and functions.
+Architectures specify how intrinsic language structures should be translated including call and control flow instructions. This annotation can only be applied to modules and functions.
 
 ### Addresses
-Address annotations change the location of a symbol in memory. They can be overriden by annotations in nested items. Annotations on modules offset all the items in the module by the same address.
+Address annotations change the location of a symbol in memory. They can be overridden by annotations in nested items. Annotations on modules offset all the items in the module by the same address.
 
 ```
 @load address
@@ -400,11 +400,11 @@ use "path" with "path.h" as identifier
 
 ## File management
 ```
-use "./path.fc"
+use "./path.lc"
 ```
 Other source files can be included at the place of usage. Source inclusions can also be namespaced:
 ```
-use "./path.fc" as identifier
+use "./path.lc" as identifier
 ```
 
 ## Namespace management

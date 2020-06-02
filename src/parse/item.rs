@@ -49,9 +49,7 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 	Ok(match node.kind() {
 		"function" => {
 			let function = super::function(context, symbols, source, node)?;
-			let parameters = function.parameters.iter()
-				.map(|parameter| parameter.node.clone()).collect();
-			context.functions.entry(path).or_default().push((parameters, function));
+			context.functions.entry(path).or_default().push(function);
 		}
 		"static" => {
 			let identifier = field_identifier(source, node);

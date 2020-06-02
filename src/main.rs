@@ -1,8 +1,10 @@
 #![feature(option_unwrap_none)]
+#![feature(entry_insert)]
 #![feature(never_type)]
 
 mod error;
 mod context;
+mod inference;
 mod arena;
 mod query;
 mod parse;
@@ -12,23 +14,17 @@ mod span;
 type Result<T> = std::result::Result<T, query::QueryError>;
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-	use query::QueryError;
 	let context = &context::Context::default();
 	let path = std::path::Path::new("examples/main.lc");
-	if let Err(QueryError::Cycle(spans)) = parse::parse(context, path) {
-		let mut diagnostic = error::Diagnostic::error()
-			.message("compilation cycle");
-		for (_, span) in spans.iter().rev() {
-			if let Some(span) = span {
-				diagnostic = diagnostic.label(span.other()
-					.with_message("in parsing symbols from file"));
-			}
-		}
+	query::emit(context, parse::parse(context, path));
 
-		context.emit(diagnostic);
-	} else {
-		println!("{:#?}", context);
-	}
+	query::emit(context,
+		inference::type_function(context, None,
+			crate::node::Path(vec![
+				crate::node::Identifier("Loader".to_string()),
+				crate::node::Identifier("Main".to_string()),
+				crate::node::Identifier("start".to_string()),
+			]), 0, None));
 
 	context::display(context)?;
 	Ok(())

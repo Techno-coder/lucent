@@ -90,7 +90,7 @@ pub fn node_type(context: &Context, symbols: &Symbols,
 fn path_type(context: &Context, source: &Source, symbols: &Symbols,
 			 node: Node) -> crate::Result<S<Type>> {
 	let path = super::path(source, node);
-	Ok(S::create(match format!("{}", path).as_str() {
+	Ok(S::create(match path.to_string().as_str() {
 		"rune" => Type::Rune,
 		"truth" => Type::Truth,
 		"never" => Type::Never,
