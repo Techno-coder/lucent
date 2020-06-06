@@ -11,6 +11,7 @@ use crate::error::Diagnostic;
 use crate::inference::Types;
 use crate::node::{Function, Path, Static, Structure};
 use crate::query::{QueryError, Table};
+use crate::span::Span;
 
 #[derive(Debug, Default)]
 pub struct Context {
@@ -38,10 +39,11 @@ impl Context {
 	}
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Files {
 	files: codespan::Files<Arc<str>>,
 	paths: HashMap<PathBuf, FileId>,
+	pub internal: Span,
 }
 
 impl Files {
@@ -58,6 +60,18 @@ impl Files {
 				Some((file, self.files.source(file).clone()))
 			}
 		}
+	}
+}
+
+impl Default for Files {
+	fn default() -> Self {
+		let paths = HashMap::new();
+		let mut files = codespan::Files::new();
+		let file = files.add("<internal>", "<compiler internal>".into());
+		let start = files.source_span(file).start().to_usize();
+		let end = files.source_span(file).end().to_usize();
+		let internal = Span::new(start..end, file);
+		Files { files, paths, internal }
 	}
 }
 

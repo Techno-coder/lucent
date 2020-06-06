@@ -26,6 +26,15 @@ impl Path {
 	}
 }
 
+impl PartialEq<[&str]> for Path {
+	fn eq(&self, other: &[&str]) -> bool {
+		let Path(elements) = self;
+		elements.len() == other.len() &&
+			Iterator::zip(elements.iter(), other)
+				.all(|(Identifier(left), right)| left == right)
+	}
+}
+
 impl fmt::Display for Path {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		let Path(path) = self;

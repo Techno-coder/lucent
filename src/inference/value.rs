@@ -244,6 +244,7 @@ fn integral(context: &Context, scene: &mut Scene, index: &ValueIndex,
 		_ if (i16::MIN as i128..=i16::MAX as i128).contains(value) => IntegralSize::Word,
 		_ if (i32::MIN as i128..=i32::MAX as i128).contains(value) => IntegralSize::Double,
 		_ if (i64::MIN as i128..=i64::MAX as i128).contains(value) => IntegralSize::Quad,
+		_ if (u64::MIN as i128..=u64::MAX as i128).contains(value) => IntegralSize::Quad,
 		_ => return context.pass(Diagnostic::error().label(span.label())
 			.message("literal does not fit in signed integral type")
 			.note("add a type annotation"))

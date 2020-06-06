@@ -17,10 +17,11 @@ pub enum Include {
 	As(Path, Identifier),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SymbolKind {
 	Function,
 	Variable,
+	Intrinsic,
 	Structure,
 	Library,
 	Module,
@@ -42,6 +43,10 @@ pub struct Symbols<'a> {
 impl<'a> Symbols<'a> {
 	pub fn root(context: &Context, path: &std::path::Path) -> crate::Result<Self> {
 		let mut symbols = Symbols { includes: vec![Vec::new()], ..Symbols::default() };
+		let internal = S::new(SymbolKind::Intrinsic, context.files.read().internal.clone());
+		["size", "start", "end"].iter().map(|intrinsic| Identifier(intrinsic.to_string()))
+			.map(|intrinsic| Path(vec![Identifier("Intrinsic".to_string()), intrinsic]))
+			.for_each(|path| symbols.table.insert(path, internal.clone()).unwrap_none());
 		file(context, &mut symbols, path, &Path::default(), None)?;
 		Ok(symbols)
 	}

@@ -22,7 +22,10 @@ pub fn path(context: &Context, scene: &mut Scene, value: &Value,
 pub fn function_call(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariable>>,
 					 value: &Value, index: &ValueIndex, path: &S<Path>, arguments: &[ValueIndex])
 					 -> crate::Result<TypeVariable> {
-	// TODO: intrinsic function calls
+	let span = value[*index].span.clone();
+	if let Some(intrinsic) = intrinsic(context, value, index, path, arguments)? {
+		return Ok(scene.ascribe(index, S::new(intrinsic, span)));
+	}
 
 	let span = value[*index].span.clone();
 	let arguments: Vec<_> = arguments.iter().map(|index|
@@ -61,7 +64,6 @@ pub fn function_call(context: &Context, scene: &mut Scene, place: Option<&S<Type
 				.message("no matching function")))?;
 
 		if candidates.next().is_some() {
-			// TODO: migrate error to declaration type ambiguity verification
 			return context.pass(Diagnostic::error().label(span.label())
 				.message("ambiguous function call"));
 		}
@@ -71,10 +73,38 @@ pub fn function_call(context: &Context, scene: &mut Scene, place: Option<&S<Type
 	}
 }
 
+fn intrinsic(context: &Context, value: &Value, index: &ValueIndex, path: &S<Path>,
+			 arguments: &[ValueIndex]) -> crate::Result<Option<Type>> {
+	match &path.node {
+		path if path == &["Intrinsic", "size"][..] => (),
+		path if path == &["Intrinsic", "start"][..] => (),
+		path if path == &["Intrinsic", "end"][..] => (),
+		_ => return Ok(None),
+	}
+
+	let span = &value[*index].span;
+	if arguments.len() != 1 {
+		return context.pass(Diagnostic::error()
+			.message("expected one argument")
+			.label(span.label()));
+	}
+
+	let path = &value[arguments[0]];
+	match path.node {
+		// TODO: use architecture pointer type
+		ValueNode::Path(_) => Ok(Some(Type::Unsigned(IntegralSize::Quad))),
+		_ => context.pass(Diagnostic::error().message("expected path")
+			.label(path.span.label())),
+	}
+}
+
 fn return_type(scene: &mut Scene, index: &ValueIndex,
 			   node: &S<ReturnType>) -> crate::Result<TypeVariable> {
 	Ok(match &node.node {
-		ReturnType::Register(_) => scene.next(),
 		ReturnType::Type(node) => scene.ascribe(index, node.clone()),
+		ReturnType::Register(_) => {
+			let variable = scene.next();
+			*scene.values.entry(*index).insert(variable).get()
+		}
 	})
 }

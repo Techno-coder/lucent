@@ -179,7 +179,8 @@ pub fn unit(scene: &mut Scene, node: Node) -> crate::Result<ValueIndex> {
 			let span = path.span;
 
 			match scene.symbols.resolve(scene.context, &path.node, &span) {
-				Some((path, SymbolKind::Function)) => {
+				Some((path, SymbolKind::Function)) |
+				Some((path, SymbolKind::Intrinsic)) => {
 					let cursor = &mut node.walk();
 					let arguments = node.children_by_field_name("argument", cursor)
 						.map(|node| unit(scene, node)).collect::<Result<_, _>>()?;
