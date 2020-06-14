@@ -8,6 +8,8 @@ pub enum Key {
 	SymbolFile(std::path::PathBuf),
 	TypeFunction(Path, FunctionKind),
 	TypeVariable(Path),
+	Offsets(Path),
+	Generate(Path, FunctionKind),
 }
 
 impl Key {
@@ -16,6 +18,8 @@ impl Key {
 			Key::SymbolFile(_) => "in parsing symbols from file",
 			Key::TypeFunction(_, _) => "in type checking function",
 			Key::TypeVariable(_) => "in type checking static variable",
+			Key::Offsets(_) => "in computing structure offsets",
+			Key::Generate(_, _) => "in generating function",
 		}
 	}
 }

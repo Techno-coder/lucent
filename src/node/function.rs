@@ -44,6 +44,7 @@ pub enum ValueNode {
 	When(Vec<(ValueIndex, ValueIndex)>),
 	Cast(ValueIndex, S<Type>),
 	Return(Option<ValueIndex>),
+	// TODO: move compile to separate value
 	Compile(ValueIndex),
 	Inline(ValueIndex),
 	Call(S<Path>, Vec<ValueIndex>),
@@ -72,8 +73,8 @@ pub enum Type {
 	Truth,
 	Never,
 	Structure(Path),
-	Signed(IntegralSize),
-	Unsigned(IntegralSize),
+	Signed(Size),
+	Unsigned(Size),
 	Pointer(Box<S<Type>>),
 	Array(Box<S<Type>>, Value),
 	Slice(Box<S<Type>>),
@@ -120,28 +121,39 @@ impl fmt::Display for Type {
 }
 
 #[derive(Debug, Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
-pub enum IntegralSize {
+pub enum Size {
 	Byte = 8,
 	Word = 16,
 	Double = 32,
 	Quad = 64,
 }
 
-impl fmt::Display for IntegralSize {
+impl Size {
+	pub fn new(bytes: usize) -> Option<Self> {
+		Some(match bytes {
+			1 => Size::Byte,
+			2 => Size::Word,
+			4 => Size::Double,
+			8 => Size::Quad,
+			_ => return None,
+		})
+	}
+
+	pub fn bytes(self) -> usize {
+		(self as usize) / 8
+	}
+}
+
+impl fmt::Display for Size {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", *self as u8)
+		write!(f, "{}", *self as usize)
 	}
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum Binary {
 	Dual(Dual),
-	Less,
-	Greater,
-	LessEqual,
-	GreaterEqual,
-	NotEqual,
-	Equal,
+	Compare(Compare),
 	And,
 	Or,
 }
@@ -149,14 +161,14 @@ pub enum Binary {
 impl Binary {
 	pub fn parse(string: &str) -> Option<Binary> {
 		Some(match string {
-			"&&" => Binary::And,
 			"||" => Binary::Or,
-			"==" => Binary::Equal,
-			"!=" => Binary::NotEqual,
-			"<" => Binary::Less,
-			">" => Binary::Greater,
-			"<=" => Binary::LessEqual,
-			">=" => Binary::GreaterEqual,
+			"&&" => Binary::And,
+			"==" => Binary::Compare(Compare::Equal),
+			"!=" => Binary::Compare(Compare::NotEqual),
+			"<" => Binary::Compare(Compare::Less),
+			">" => Binary::Compare(Compare::Greater),
+			"<=" => Binary::Compare(Compare::LessEqual),
+			">=" => Binary::Compare(Compare::GreaterEqual),
 			_ => Binary::Dual(Dual::parse(string)?),
 		})
 	}
@@ -192,6 +204,16 @@ impl Dual {
 			_ => return None,
 		})
 	}
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Compare {
+	Less,
+	Greater,
+	LessEqual,
+	GreaterEqual,
+	NotEqual,
+	Equal,
 }
 
 #[derive(Debug, Copy, Clone)]

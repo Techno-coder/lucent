@@ -101,8 +101,8 @@ pub fn value(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariable
 			scene.ascribe(index, S::new(Type::Void, span.clone()))
 		}
 		ValueNode::Binary(binary, left, right) => match binary {
-			Binary::Less | Binary::LessEqual |
-			Binary::Greater | Binary::GreaterEqual => {
+			Binary::Compare(Compare::Less) | Binary::Compare(Compare::LessEqual) |
+			Binary::Compare(Compare::Greater) | Binary::Compare(Compare::GreaterEqual) => {
 				integral_type(context, scene, place, value, left)?;
 				let left_node = *scene.values.get(left).unwrap();
 				let right_node = self::value(context, scene, place, value, right)?;
@@ -110,7 +110,7 @@ pub fn value(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariable
 				scene.unify(context, left_node, right_node, left_span, right_span);
 				scene.ascribe(index, S::new(Type::Truth, span.clone()))
 			}
-			Binary::Equal | Binary::NotEqual => {
+			Binary::Compare(Compare::Equal) | Binary::Compare(Compare::NotEqual) => {
 				let left_node = self::value(context, scene, place, value, left)?;
 				let right_node = self::value(context, scene, place, value, right)?;
 				let (left_span, right_span) = (&value[*left].span, &value[*right].span);
@@ -150,8 +150,9 @@ pub fn value(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariable
 				scene.ascribe(index, S::new(Type::Truth, span.clone()))
 			}
 		},
-		ValueNode::Variable(variable) => *scene.variables
-			.get(variable).map(|(variable, _)| variable).unwrap(),
+		ValueNode::Variable(variable) => *scene.values
+			.entry(*index).insert(*scene.variables.get(variable)
+			.map(|(variable, _)| variable).unwrap()).get(),
 		ValueNode::Path(path) => super::path(context,
 			scene, value, index, path)?,
 		ValueNode::String(string) => {
@@ -223,7 +224,7 @@ fn integral_type(context: &Context, scene: &mut Scene, place: Option<&S<TypeVari
 				 value: &Value, index: &ValueIndex) -> crate::Result<()> {
 	let index_span = &value[*index].span;
 	let index = self::value(context, scene, place, value, index)?;
-	let index_type = S::new(IntegralSize::Byte, index_span.clone());
+	let index_type = S::new(Size::Byte, index_span.clone());
 	let index_type = scene.next_with(Terminal::Integral(index_type));
 	Ok(scene.unify(context, index, index_type, index_span, index_span))
 }
@@ -240,11 +241,11 @@ fn truth_type(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariabl
 fn integral(context: &Context, scene: &mut Scene, index: &ValueIndex,
 			value: &i128, span: Span) -> crate::Result<TypeVariable> {
 	Ok(scene.terminal(index, Terminal::Integral(S::new(match value {
-		_ if (i8::MIN as i128..=i8::MAX as i128).contains(value) => IntegralSize::Byte,
-		_ if (i16::MIN as i128..=i16::MAX as i128).contains(value) => IntegralSize::Word,
-		_ if (i32::MIN as i128..=i32::MAX as i128).contains(value) => IntegralSize::Double,
-		_ if (i64::MIN as i128..=i64::MAX as i128).contains(value) => IntegralSize::Quad,
-		_ if (u64::MIN as i128..=u64::MAX as i128).contains(value) => IntegralSize::Quad,
+		_ if (i8::MIN as i128..=i8::MAX as i128).contains(value) => Size::Byte,
+		_ if (i16::MIN as i128..=i16::MAX as i128).contains(value) => Size::Word,
+		_ if (i32::MIN as i128..=i32::MAX as i128).contains(value) => Size::Double,
+		_ if (i64::MIN as i128..=i64::MAX as i128).contains(value) => Size::Quad,
+		_ if (u64::MIN as i128..=u64::MAX as i128).contains(value) => Size::Quad,
 		_ => return context.pass(Diagnostic::error().label(span.label())
 			.message("literal does not fit in signed integral type")
 			.note("add a type annotation"))

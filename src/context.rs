@@ -8,8 +8,9 @@ use dashmap::DashMap;
 use parking_lot::{Mutex, RwLock};
 
 use crate::error::Diagnostic;
+use crate::generate::Section;
 use crate::inference::Types;
-use crate::node::{Function, Path, Static, Structure};
+use crate::node::{Function, Offsets, Path, Static, Structure};
 use crate::query::{QueryError, Table};
 use crate::span::Span;
 
@@ -21,6 +22,8 @@ pub struct Context {
 	pub structures: DashMap<Path, Structure>,
 	pub functions: DashMap<Path, Vec<Function>>,
 	pub type_contexts: Table<Types>,
+	pub sections: Table<Section>,
+	pub offsets: Table<Offsets>,
 	diagnostics: Mutex<Vec<Diagnostic>>,
 }
 

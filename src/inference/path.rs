@@ -92,7 +92,7 @@ fn intrinsic(context: &Context, value: &Value, index: &ValueIndex, path: &S<Path
 	let path = &value[arguments[0]];
 	match path.node {
 		// TODO: use architecture pointer type
-		ValueNode::Path(_) => Ok(Some(Type::Unsigned(IntegralSize::Quad))),
+		ValueNode::Path(_) => Ok(Some(Type::Unsigned(Size::Quad))),
 		_ => context.pass(Diagnostic::error().message("expected path")
 			.label(path.span.label())),
 	}

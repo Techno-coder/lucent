@@ -3,7 +3,7 @@ use std::fmt;
 
 use crate::context::Context;
 use crate::error::Diagnostic;
-use crate::node::{FunctionKind, IntegralSize, Type, Value, ValueIndex, ValueNode, Variable};
+use crate::node::{FunctionKind, Size, Type, Value, ValueIndex, ValueNode, Variable};
 use crate::span::{S, Span};
 
 pub type TypeVariable = usize;
@@ -14,7 +14,7 @@ pub enum Terminal {
 	Slice(TypeVariable),
 	Sequence(TypeVariable),
 	Array(TypeVariable, usize),
-	Integral(S<IntegralSize>),
+	Integral(S<Size>),
 	Pointer(TypeVariable),
 }
 
@@ -51,7 +51,6 @@ impl fmt::Display for Terminal {
 
 #[derive(Debug, Default)]
 pub struct Scene {
-	// TODO: add place to scene
 	pub parent: Option<crate::query::Key>,
 	pub terminals: HashMap<TypeVariable, Terminal>,
 	pub parents: HashMap<TypeVariable, TypeVariable>,
@@ -59,6 +58,7 @@ pub struct Scene {
 	pub variables: HashMap<Variable, (TypeVariable, Span)>,
 	pub functions: HashMap<ValueIndex, FunctionKind>,
 	pub next_type: TypeVariable,
+	pub failure: bool,
 }
 
 impl Scene {
@@ -77,7 +77,16 @@ impl Scene {
 				 right: TypeVariable, left_span: &Span, right_span: &Span) {
 		use Terminal::{Integral, Array, Slice, Sequence, Pointer};
 		let (left, right) = (self.find(left), self.find(right));
+		if left == right { return; }
+
 		match (self.terminals.get(&left), self.terminals.get(&right)) {
+			(Some(Integral(left_size)), Some(Integral(right_size))) => {
+				let maximum = std::cmp::max(left_size.node, right_size.node);
+				let left_node = S::new(maximum, left_size.span.clone());
+				self.terminals.insert(left, Terminal::Integral(left_node));
+				self.parents.insert(right, left);
+				self.terminals.remove(&right);
+			}
 			(Some(left), Some(right)) if Terminal::equal(context, left, right) => (),
 			(Some(Terminal::Type(S { node: Type::Array(left, _left_size), .. })),
 				Some(Array(right, _right_size))) => {
@@ -99,13 +108,6 @@ impl Scene {
 				let terminal = self.terminals.get(&left).cloned();
 				self.terminals.insert(right, terminal.unwrap());
 			}
-			(Some(Integral(left_size)), Some(Integral(right_size))) => {
-				let maximum = std::cmp::max(left_size.node, right_size.node);
-				let left_node = S::new(maximum, left_size.span.clone());
-				let right_node = S::new(maximum, right_size.span.clone());
-				self.terminals.insert(left, Terminal::Integral(left_node));
-				self.terminals.insert(right, Terminal::Integral(right_node));
-			}
 			(Some(Slice(left)), Some(Slice(right))) |
 			(Some(Sequence(left)), Some(Slice(right))) |
 			(Some(Sequence(left)), Some(Array(right, _))) |
@@ -123,10 +125,13 @@ impl Scene {
 			(Some(Integral(_)), Some(Terminal::Type(_))) |
 			(Some(Array(_, _)), _) | (Some(Slice(_)), _) =>
 				self.unify(context, right, left, right_span, left_span),
-			(Some(left), Some(right)) => context.emit(Diagnostic::error()
-				.label(left_span.label().with_message(left.to_string()))
-				.label(right_span.label().with_message(right.to_string()))
-				.message("conflicting types")),
+			(Some(left), Some(right)) => {
+				self.failure = true;
+				context.emit(Diagnostic::error()
+					.label(left_span.label().with_message(left.to_string()))
+					.label(right_span.label().with_message(right.to_string()))
+					.message("conflicting types"))
+			}
 			(Some(_), None) => { self.parents.insert(right, left); }
 			(None, Some(_)) => { self.parents.insert(left, right); }
 			(None, None) => { self.parents.insert(left, right); }

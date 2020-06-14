@@ -2,7 +2,7 @@ use tree_sitter::Node;
 
 use crate::context::Context;
 use crate::error::Diagnostic;
-use crate::node::{Function, Identifier, IntegralSize, Parameter, ReturnType, Type};
+use crate::node::{Function, Identifier, Parameter, ReturnType, Size, Type};
 use crate::parse::Scene;
 use crate::span::S;
 
@@ -94,14 +94,14 @@ fn path_type(context: &Context, source: &Source, symbols: &Symbols,
 		"rune" => Type::Rune,
 		"truth" => Type::Truth,
 		"never" => Type::Never,
-		"i8" => Type::Signed(IntegralSize::Byte),
-		"i16" => Type::Signed(IntegralSize::Word),
-		"i32" => Type::Signed(IntegralSize::Double),
-		"i64" => Type::Signed(IntegralSize::Quad),
-		"u8" => Type::Unsigned(IntegralSize::Byte),
-		"u16" => Type::Unsigned(IntegralSize::Word),
-		"u32" => Type::Unsigned(IntegralSize::Double),
-		"u64" => Type::Unsigned(IntegralSize::Quad),
+		"i8" => Type::Signed(Size::Byte),
+		"i16" => Type::Signed(Size::Word),
+		"i32" => Type::Signed(Size::Double),
+		"i64" => Type::Signed(Size::Quad),
+		"u8" => Type::Unsigned(Size::Byte),
+		"u16" => Type::Unsigned(Size::Word),
+		"u32" => Type::Unsigned(Size::Double),
+		"u64" => Type::Unsigned(Size::Quad),
 		_ => match symbols.resolve(context, &path.node, &path.span) {
 			Some((path, SymbolKind::Structure)) => Type::Structure(path),
 			Some(_) => return context.pass(Diagnostic::error().label(path.span.label())

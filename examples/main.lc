@@ -29,9 +29,7 @@ module Loader
 			*(0xb8004 as *u32) = 0x4f3a4f52
 			*(0xb8008 as *u32) = 0x4f204f20
 			*(0xb800a as *u32) = code
-			inline x32.halt()
+			// inline x86.halt()
+			while true: true
 
 	static STACK: [u8; 64 * 1024]
-
-module x32
-	fn halt() never = true

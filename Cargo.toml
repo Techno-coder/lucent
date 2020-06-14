@@ -11,5 +11,15 @@ codespan-reporting = "^0.9"
 codespan = "^0.9"
 dashmap = "^3.0"
 
+[dependencies.iced-x86]
+version = "^1.2"
+default-features = false
+features = [
+	"std",
+	"nasm",
+	"block_encoder",
+	"db",
+]
+
 [build-dependencies]
 cc = "*"

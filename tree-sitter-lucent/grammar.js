@@ -270,7 +270,7 @@ module.exports = grammar({
         )),
 
         create: $ => prec.right(seq(
-            field('path', $.path), ':',
+            field('path', $.path), '~',
             separated(',', prec.right(field('field',
                 choice($.identifier, $.field)))),
         )),

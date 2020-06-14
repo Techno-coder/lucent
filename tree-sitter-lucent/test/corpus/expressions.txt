@@ -225,7 +225,7 @@ Construction
 =====================================
 
 fn function()
-	Structure: field = true, field
+	Structure ~ field = true, field
 
 ---
 

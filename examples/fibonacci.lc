@@ -1,0 +1,18 @@
+@@binary MachO
+@@entry Intrinsic.start(Main.main)
+
+@architecture x64
+module Main
+	fn main() u8
+		(fibonacci(45) % 100) as u8
+
+	fn fibonacci(n: u64) u64
+		let i = 0
+		let a = 0
+		let b = 0
+		while i < n:
+			let c = a + b
+			a = b
+			b = c
+			i += 1
+		b
