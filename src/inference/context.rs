@@ -26,13 +26,14 @@ impl Index<&ValueIndex> for Types {
 	}
 }
 
-pub fn type_function(context: &Context, parent: Option<Key>, path: &Path,
-					 kind: FunctionKind, span: Option<Span>) -> crate::Result<Arc<Types>> {
-	let key = Key::TypeFunction(path.clone(), kind);
+pub fn type_function(context: &Context, parent: Option<Key>, path: &FunctionPath,
+					 span: Option<Span>) -> crate::Result<Arc<Types>> {
+	let key = Key::TypeFunction(path.clone());
 	context.type_contexts.scope(parent, key.clone(), span, || {
+		let FunctionPath(path, kind) = path;
 		let functions = context.functions.get(path);
 		let function = functions.as_ref().and_then(|table|
-			table.get(kind)).ok_or(QueryError::Failure)?;
+			table.get(*kind)).ok_or(QueryError::Failure)?;
 		let mut scene = Scene::default();
 		scene.parent = Some(key);
 

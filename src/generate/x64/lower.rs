@@ -5,7 +5,7 @@ use iced_x86::{BlockEncoder, BlockEncoderOptions, Instruction, InstructionBlock}
 
 use crate::context::Context;
 use crate::generate::Section;
-use crate::node::{FunctionKind, Parameter, Path, Variable};
+use crate::node::{FunctionPath, Variable};
 use crate::query::{Key, QueryError};
 use crate::span::Span;
 
@@ -52,40 +52,12 @@ impl Translation {
 	}
 }
 
-pub fn translate(context: &Context, parent: Option<Key>, path: &Path,
-				 kind: FunctionKind, span: Option<Span>) -> crate::Result<Translation> {
-	let functions = context.functions.get(&path);
-	let function = functions.as_ref().and_then(|table|
-		table.get(kind)).ok_or(QueryError::Failure)?;
-	let types = crate::inference::type_function(context,
-		parent.clone(), path, kind, span)?;
-
-	let mut translation = Translation::default();
-	let scene = &mut Scene { parent, ..Scene::default() };
-
-	// TODO: parameters
-	for parameter in &function.parameters {
-		match &parameter.node {
-			Parameter::Variable(variable, _) => {
-				scene.variable(variable.node.clone(), 8);
-			}
-			_ => (),
-		}
-	}
-
-	super::value(context, scene, &mut translation, &types,
-		&function.value, &function.value.root)?;
-
-	// TODO: return value
-	Ok(translation)
-}
-
-pub fn lower(context: &Context, parent: Option<Key>, path: &Path,
-			 kind: FunctionKind, span: Option<Span>) -> crate::Result<Arc<Section>> {
-	let key = Key::Generate(path.clone(), kind);
+pub fn lower(context: &Context, parent: Option<Key>, path: &FunctionPath,
+			 span: Option<Span>) -> crate::Result<Arc<Section>> {
+	let key = Key::Generate(path.clone());
 	context.sections.scope(parent, key.clone(), span.clone(), || {
 		let parent = Some(key.clone());
-		let translation = translate(context, parent, path, kind, span)?;
+		let translation = translate(context, parent, path, span)?;
 
 		// TODO: remove display code
 		use iced_x86::Formatter;
@@ -105,4 +77,30 @@ pub fn lower(context: &Context, parent: Option<Key>, path: &Path,
 		section.bytes = block.code_buffer;
 		Ok(section)
 	})
+}
+
+pub fn translate(context: &Context, parent: Option<Key>, path: &FunctionPath,
+				 span: Option<Span>) -> crate::Result<Translation> {
+	let FunctionPath(function, kind) = path;
+	let functions = context.functions.get(&function);
+	let function = functions.as_ref().and_then(|table|
+		table.get(*kind)).ok_or(QueryError::Failure)?;
+	let types = crate::inference::type_function(context,
+		parent.clone(), path, span)?;
+
+	let mut translation = Translation::default();
+	let scene = &mut Scene { parent, ..Scene::default() };
+	let internal = context.files.read().internal.clone();
+	super::entry(&mut translation, &internal);
+	super::parameters(context, function, scene)?;
+
+	super::value(context, scene, &mut translation, &types,
+		&function.value, &function.value.root)?;
+	// TODO: return value
+
+	// TODO: Is the exit redundant?
+	super::exit(&mut translation, &internal);
+	let frame_size = -scene.next_offset as i32;
+	translation.instructions[2].set_immediate_i32(1, frame_size);
+	Ok(translation)
 }

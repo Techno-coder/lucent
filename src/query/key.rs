@@ -1,25 +1,25 @@
 use crate::context::Context;
 use crate::error::Diagnostic;
-use crate::node::{FunctionKind, Path};
+use crate::node::{FunctionPath, Path};
 use crate::query::QueryError;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Key {
 	SymbolFile(std::path::PathBuf),
-	TypeFunction(Path, FunctionKind),
+	TypeFunction(FunctionPath),
 	TypeVariable(Path),
 	Offsets(Path),
-	Generate(Path, FunctionKind),
+	Generate(FunctionPath),
 }
 
 impl Key {
 	fn action(&self) -> &'static str {
 		match self {
 			Key::SymbolFile(_) => "in parsing symbols from file",
-			Key::TypeFunction(_, _) => "in type checking function",
+			Key::TypeFunction(_) => "in type checking function",
 			Key::TypeVariable(_) => "in type checking static variable",
 			Key::Offsets(_) => "in computing structure offsets",
-			Key::Generate(_, _) => "in generating function",
+			Key::Generate(_) => "in generating function",
 		}
 	}
 }

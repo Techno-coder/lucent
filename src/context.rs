@@ -10,7 +10,7 @@ use parking_lot::{Mutex, RwLock};
 use crate::error::Diagnostic;
 use crate::generate::Section;
 use crate::inference::Types;
-use crate::node::{Function, Offsets, Path, Static, Structure};
+use crate::node::{Function, Item, Module, Offsets, Path, Position, Static, Structure, Symbol};
 use crate::query::{QueryError, Table};
 use crate::span::Span;
 
@@ -18,9 +18,12 @@ use crate::span::Span;
 pub struct Context {
 	pub files: RwLock<Files>,
 	pub symbol_files: Table<()>,
+	pub items: RwLock<Vec<Item>>,
+	pub modules: DashMap<Path, Module>,
 	pub statics: DashMap<Path, Static>,
 	pub structures: DashMap<Path, Structure>,
 	pub functions: DashMap<Path, Vec<Function>>,
+	pub positions: RwLock<HashMap<Symbol, Position>>,
 	pub type_contexts: Table<Types>,
 	pub sections: Table<Section>,
 	pub offsets: Table<Offsets>,

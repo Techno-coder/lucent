@@ -340,7 +340,7 @@ Address annotations change the location of a symbol in memory. They can be overr
 @load address
 item
 ```
-The `load` annotation sets where the item is to be loaded into memory. Specifically, it sets the memory address where the loader should copy the binary contents.
+The `load` annotation sets where the item is to be loaded into memory. Specifically, it sets the memory address where the loader should copy the binary contents. This also sets the virtual address for the item.
 
 ```
 @virtual address

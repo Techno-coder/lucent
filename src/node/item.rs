@@ -4,6 +4,19 @@ use std::fmt;
 use crate::node::Variable;
 use crate::span::S;
 
+#[derive(Debug)]
+pub enum Item {
+	Symbol(Symbol),
+	ModuleEnd,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum Symbol {
+	Module(Path),
+	Variable(Path),
+	Function(FunctionPath),
+}
+
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Identifier(pub String);
 
@@ -71,6 +84,9 @@ pub struct Static {
 
 pub type FunctionKind = usize;
 
+#[derive(Debug, Default, Clone, Hash, Eq, PartialEq)]
+pub struct FunctionPath(pub Path, pub FunctionKind);
+
 #[derive(Debug)]
 pub struct Function {
 	pub is_root: bool,
@@ -91,4 +107,11 @@ pub enum ReturnType {
 pub enum Parameter {
 	Register(S<Identifier>),
 	Variable(S<Variable>, S<super::Type>),
+}
+
+#[derive(Debug)]
+pub struct Module {
+	pub annotations: Vec<super::Annotation>,
+	pub first: Option<Symbol>,
+	pub last: Option<Symbol>,
 }

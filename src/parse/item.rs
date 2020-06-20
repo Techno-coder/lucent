@@ -7,11 +7,11 @@ use tree_sitter::{Language, Node, Parser, Query};
 
 use crate::context::Context;
 use crate::error::Diagnostic;
-use crate::node::{Annotation, Identifier, Path, Static, Structure};
+use crate::node::*;
 use crate::parse::Include;
 use crate::span::S;
 
-use super::{Item, Symbols};
+use super::{Symbols, Unit};
 
 extern { fn tree_sitter_lucent() -> Language; }
 
@@ -35,12 +35,14 @@ pub fn errors() -> Query {
 }
 
 pub fn parse(context: &Context, path: &std::path::Path) -> crate::Result<()> {
-	let symbols = &mut Symbols::root(context, path)?;
-	let items = std::mem::take(&mut symbols.items);
-	items.iter().map(|item| match item {
-		Item::ModuleEnd => Ok(symbols.pop()),
-		Item::Item((path, source, node)) => self::item(context,
-			symbols, path.clone(), source, *node),
+	let (mut symbols, units) = Symbols::root(context, path)?;
+	units.iter().map(|unit| match unit {
+		Unit::ModuleEnd => {
+			context.items.write().push(Item::ModuleEnd);
+			Ok(symbols.pop())
+		}
+		Unit::Item(path, source, node) => self::item(context,
+			&mut symbols, path.clone(), source, *node),
 	}).filter(Result::is_err).last().unwrap_or(Ok(()))
 }
 
@@ -49,7 +51,10 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 	Ok(match node.kind() {
 		"function" => {
 			let function = super::function(context, symbols, source, node)?;
-			context.functions.entry(path).or_default().push(function);
+			let functions = &mut context.functions.entry(path.clone()).or_default();
+			let symbol = Symbol::Function(FunctionPath(path, functions.len()));
+			context.items.write().push(Item::Symbol(symbol));
+			functions.push(function);
 		}
 		"static" => {
 			let identifier = field_identifier(source, node);
@@ -58,6 +63,9 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 			let value = node.child_by_field_name("value").map(|node|
 				super::value(context, symbols, source, node)).transpose()?;
 			let variable = Static { identifier, node_type, value };
+
+			let symbol = Symbol::Variable(path.clone());
+			context.items.write().push(Item::Symbol(symbol));
 			context.statics.insert(path, variable);
 		}
 		"use" => {
@@ -93,29 +101,35 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 				};
 			}
 
-			let annotations = annotations(context, symbols, source, node)?;
+			let annotations = annotations(context, symbols, source, node);
 			context.structures.insert(path, Structure { annotations, fields });
 		}
 		"module" => {
+			let symbol = Symbol::Module(path.clone());
+			context.items.write().push(Item::Symbol(symbol));
+			let annotations = annotations(context, symbols, source, node);
+			let module = Module { annotations, first: None, last: None };
+			context.modules.insert(path.clone(), module);
+
 			symbols.push();
 			symbols.include(S::create(Include::Wild(path),
 				node.byte_range(), source.file));
-			// TODO: implement module loading
 		}
 		"annotation" => (), // TODO: implement global annotations
 		other => panic!("invalid item kind: {}", other),
 	})
 }
 
-pub fn annotations(context: &Context, symbols: &Symbols, source: &Source,
-				   node: Node) -> crate::Result<Vec<Annotation>> {
+pub fn annotations(context: &Context, symbols: &Symbols,
+				   source: &Source, node: Node) -> Vec<Annotation> {
 	let cursor = &mut node.walk();
 	node.children_by_field_name("annotation", cursor)
 		.map(|node| Ok(Annotation {
-			name: identifier(source, node),
+			name: node.child_by_field_name("name")
+				.map(|node| identifier(source, node)).unwrap(),
 			value: super::value(context, symbols, source,
 				node.child_by_field_name("value").unwrap())?,
-		})).collect()
+		})).filter_map(crate::Result::ok).collect()
 }
 
 pub fn path(source: &Source, node: Node) -> S<Path> {

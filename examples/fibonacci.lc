@@ -2,8 +2,9 @@
 @@entry Intrinsic.start(Main.main)
 
 @architecture x64
+@load 1024 * 1024
 module Main
-	fn main() u8
+	root fn main() u8
 		(fibonacci(45) % 100) as u8
 
 	fn fibonacci(n: u64) u64

@@ -6,7 +6,6 @@ use crate::context::Context;
 use crate::error::Diagnostic;
 use crate::inference::Types;
 use crate::node::{Binary, Size, Type, Value, ValueIndex, ValueNode};
-use crate::span::Span;
 
 use super::{Scene, Translation};
 
@@ -24,7 +23,7 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 				&types.variables[&variable.node], Some(span.clone()))?;
 			let offset = scene.variable(variable.node.clone(), size);
 			let memory = M::with_base_displ(Register::RBP, offset as i32);
-			set(prime, &types[index], size, memory, match types[index] {
+			super::set(prime, &types[index], size, memory, match types[index] {
 				Type::Truth => Register::AL,
 				Type::Rune => Register::EAX,
 				Type::Signed(size) | Type::Unsigned(size) => match size {
@@ -40,16 +39,16 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 		}
 		ValueNode::Set(target, index) => {
 			self::value(context, scene, prime, types, value, index)?;
-			push_value(prime, &types[index], span).ok_or_else(|| context
-				.error(Diagnostic::error().label(value[*index].span.label())
+			super::push_value(prime, &types[index], span).ok_or_else(||
+				context.error(Diagnostic::error().label(value[*index].span.label())
 					.message(format!("cannot assign value of type: {}", types[index]))))?;
 			super::target(context, scene, prime, types, value, target)?;
 
 			let size = crate::node::size(context, scene.parent
 				.clone(), &types[index], Some(span.clone()))?;
 			let memory = M::with_base_index(Register::RBP, Register::RAX);
-			let alternate = alternate(prime, &types[index], span).unwrap();
-			set(prime, &types[index], size, memory, alternate, span);
+			let alternate = super::alternate(prime, &types[index], span).unwrap();
+			super::set(prime, &types[index], size, memory, alternate, span);
 		}
 		ValueNode::While(condition, index) => {
 			let entry = *prime.pending_label.get_or_insert_with(|| scene.label());
@@ -78,15 +77,15 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 		ValueNode::Compound(dual, target, index) => {
 			super::binary(context, scene, prime, types, value,
 				&Binary::Dual(*dual), target, index, span)?;
-			push_value(prime, &types[index], span).unwrap_or_else(||
+			super::push_value(prime, &types[index], span).unwrap_or_else(||
 				panic!("cannot assign value of type: {}", &types[index]));
 			super::target(context, scene, prime, types, value, target)?;
 
 			let size = crate::node::size(context, scene.parent
 				.clone(), &types[index], Some(span.clone()))?;
 			let memory = M::with_base_index(Register::RBP, Register::RAX);
-			let alternate = alternate(prime, &types[index], span).unwrap();
-			set(prime, &types[index], size, memory, alternate, span);
+			let alternate = super::alternate(prime, &types[index], span).unwrap();
+			super::set(prime, &types[index], size, memory, alternate, span);
 		}
 		ValueNode::Binary(binary, left, right) => super::binary(context,
 			scene, prime, types, value, binary, left, right, span)?,
@@ -138,66 +137,4 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			note(I::with_reg_u32(Code::Mov_r32_imm32, Register::EAX, *rune as u32)),
 		ValueNode::Break => unimplemented!(),
 	})
-}
-
-pub fn set(prime: &mut Translation, path: &Type, _size: usize,
-		   memory: M, register: Register, span: &Span) {
-	let code = match path {
-		Type::Truth => Code::Mov_rm8_r8,
-		Type::Rune => Code::Mov_rm32_r32,
-		Type::Pointer(_) => Code::Mov_rm64_r64,
-		Type::Signed(size) | Type::Unsigned(size) => match size {
-			Size::Byte => Code::Mov_rm8_r8,
-			Size::Word => Code::Mov_rm16_r16,
-			Size::Double => Code::Mov_rm32_r32,
-			Size::Quad => Code::Mov_rm64_r64,
-		},
-		Type::Slice(_) => unimplemented!(),
-		Type::Array(_, _) => unimplemented!(),
-		Type::Structure(_) => unimplemented!(),
-		Type::Void | Type::Never => unreachable!(),
-	};
-
-	define_note!(note, prime, span);
-	note(I::with_mem_reg(code, memory, register));
-}
-
-pub fn push_value(prime: &mut Translation, path: &Type, span: &Span) -> Option<Register> {
-	let (code, register) = match path {
-		Type::Void | Type::Never => return None,
-		Type::Truth => (Code::Push_r16, Register::AX),
-		Type::Rune => (Code::Push_r32, Register::EAX),
-		Type::Array(_, _) | Type::Slice(_) | Type::Structure(_)
-		| Type::Pointer(_) => (Code::Push_r64, Register::RAX),
-		Type::Signed(size) | Type::Unsigned(size) => match size {
-			Size::Byte => (Code::Push_r16, Register::AX),
-			Size::Word => (Code::Push_r16, Register::AX),
-			Size::Double => (Code::Push_r32, Register::EAX),
-			Size::Quad => (Code::Push_r64, Register::RAX),
-		}
-	};
-
-	define_note!(note, prime, span);
-	note(I::with_reg(code, register));
-	Some(register)
-}
-
-pub fn alternate(prime: &mut Translation, path: &Type, span: &Span) -> Option<Register> {
-	let (code, alternate) = match path {
-		Type::Void | Type::Never => return None,
-		Type::Truth => (Code::Pop_r16, Register::BX),
-		Type::Rune => (Code::Pop_r32, Register::EBX),
-		Type::Array(_, _) | Type::Slice(_) | Type::Structure(_)
-		| Type::Pointer(_) => (Code::Pop_r64, Register::RBX),
-		Type::Signed(size) | Type::Unsigned(size) => match size {
-			Size::Byte => (Code::Pop_r16, Register::BX),
-			Size::Word => (Code::Pop_r16, Register::BX),
-			Size::Double => (Code::Pop_r32, Register::EBX),
-			Size::Quad => (Code::Pop_r64, Register::RBX),
-		}
-	};
-
-	define_note!(note, prime, span);
-	note(I::with_reg(code, alternate));
-	Some(alternate)
 }

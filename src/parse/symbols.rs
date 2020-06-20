@@ -11,6 +11,7 @@ use crate::span::{S, Span};
 
 use super::Source;
 
+#[derive(Debug)]
 pub enum Include {
 	Wild(Path),
 	Item(Path),
@@ -27,28 +28,29 @@ pub enum SymbolKind {
 	Module,
 }
 
-pub enum Item<'a> {
-	Item((Path, Source, Node<'a>)),
+pub enum Unit<'a> {
+	Item(Path, Source, Node<'a>),
 	ModuleEnd,
 }
 
 #[derive(Default)]
 pub struct Symbols<'a> {
-	pub items: Vec<Item<'a>>,
 	table: HashMap<Path, S<SymbolKind>>,
 	includes: Vec<Vec<S<Include>>>,
 	trees: OwnedArena<'a, Tree>,
 }
 
 impl<'a> Symbols<'a> {
-	pub fn root(context: &Context, path: &std::path::Path) -> crate::Result<Self> {
+	pub fn root(context: &Context, path: &std::path::Path)
+				-> crate::Result<(Self, Vec<Unit<'a>>)> {
+		let mut units = Vec::new();
 		let mut symbols = Symbols { includes: vec![Vec::new()], ..Symbols::default() };
 		let internal = S::new(SymbolKind::Intrinsic, context.files.read().internal.clone());
 		["size", "start", "end"].iter().map(|intrinsic| Identifier(intrinsic.to_string()))
 			.map(|intrinsic| Path(vec![Identifier("Intrinsic".to_string()), intrinsic]))
 			.for_each(|path| symbols.table.insert(path, internal.clone()).unwrap_none());
-		file(context, &mut symbols, path, &Path::default(), None)?;
-		Ok(symbols)
+		file(context, &mut symbols, &mut units, path, &Path::default(), None)?;
+		Ok((symbols, units))
 	}
 
 	pub fn resolve(&self, context: &Context, path: &Path,
@@ -98,8 +100,8 @@ impl<'a> Symbols<'a> {
 	}
 }
 
-fn file(context: &Context, symbols: &mut Symbols, file: &std::path::Path,
-		path: &Path, span: Option<Span>) -> crate::Result<()> {
+fn file<'a>(context: &Context, symbols: &mut Symbols<'a>, units: &mut Vec<Unit<'a>>,
+			file: &std::path::Path, path: &Path, span: Option<Span>) -> crate::Result<()> {
 	let canonical = file.canonicalize().ok();
 	let (source, text) = {
 		let mut files = context.files.write();
@@ -127,12 +129,12 @@ fn file(context: &Context, symbols: &mut Symbols, file: &std::path::Path,
 		let tree = super::parser().parse(text.as_bytes(), None).unwrap();
 		let source = super::Source { file: source, path: file, text };
 		let root_node = symbols.trees.push(tree).root_node();
-		traverse(context, symbols, &source, path, root_node)
+		traverse(context, symbols, units, &source, path, root_node)
 	}).map(std::mem::drop)
 }
 
-fn traverse<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
-				path: &Path, node: Node<'a>) -> crate::Result<()> {
+fn traverse<'a>(context: &Context, symbols: &mut Symbols<'a>, units: &mut Vec<Unit<'a>>,
+				source: &Source, path: &Path, node: Node<'a>) -> crate::Result<()> {
 	let (cursor, errors) = (&mut node.walk(), &super::errors());
 	let mut nodes = node.named_children(cursor);
 	nodes.try_for_each(|node: Node| Ok(match node.kind() {
@@ -142,26 +144,25 @@ fn traverse<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
 			let path = path.push(element.node.clone());
 			match symbols.table.get(&path) {
 				None | Some(S { node: SymbolKind::Structure, .. }) => {
-					symbols.items.push(Item::Item((path.clone(), source.clone(), node)));
+					units.push(Unit::Item(path.clone(), source.clone(), node));
 					let symbol = S::new(SymbolKind::Module, element.span);
 					symbols.table.insert(path.clone(), symbol);
-					traverse(context, symbols, source, &path, node)?;
-					symbols.items.push(Item::ModuleEnd);
+					traverse(context, symbols, units, source, &path, node)?;
+					units.push(Unit::ModuleEnd);
 				}
 				Some(other) => context.emit(Diagnostic::error().message("duplicate symbol")
 					.label(element.span.label()).label(other.span.label())),
 			}
 		}
 		_ if !valid(context, source, errors, node) => (),
-		"annotation" => symbols.items
-			.push(Item::Item((path.clone(), source.clone(), node))),
-		"function" => function(context, symbols, source, path,
-			node, super::field_identifier(source, node)),
-		"static" => duplicate(context, symbols, source, path, node,
+		"annotation" => units.push(Unit::Item(path.clone(), source.clone(), node)),
+		"function" => function(context, symbols, units, source,
+			path, node, super::field_identifier(source, node)),
+		"static" => duplicate(context, symbols, units, source, path, node,
 			SymbolKind::Variable, super::field_identifier(source, node)),
-		"data" => duplicate(context, symbols, source, path, node,
+		"data" => duplicate(context, symbols, units, source, path, node,
 			SymbolKind::Structure, super::field_identifier(source, node)),
-		"use" => import(context, symbols, source, path, node)?,
+		"use" => import(context, symbols, units, source, path, node)?,
 		_ => (),
 	}))
 }
@@ -181,8 +182,8 @@ fn syntax_error(context: &Context, source: &Source, node: Node) {
 	context.emit(Diagnostic::error().message("syntax error").label(label));
 }
 
-fn import<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
-			  path: &Path, node: Node<'a>) -> crate::Result<()> {
+fn import<'a>(context: &Context, symbols: &mut Symbols<'a>, units: &mut Vec<Unit<'a>>,
+			  source: &Source, path: &Path, node: Node<'a>) -> crate::Result<()> {
 	let node_path = node.child_by_field_name("path").unwrap();
 	Ok(match node_path.kind() {
 		"string" => {
@@ -194,31 +195,30 @@ fn import<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
 				.map(|node| super::identifier(source, node));
 
 			if extension == Some("lc") {
-				let path = path_as.map(|node| path.push(node.node))
-					.unwrap_or_else(|| path.clone());
-				self::file(context, symbols, file,
-					&path, Some(other.span))?;
+				let path = path_as.map(|node| path
+					.push(node.node)).unwrap_or_else(|| path.clone());
+				self::file(context, symbols, units, file, &path, Some(other.span))?;
 			} else if let Some(identifier) = path_as {
-				duplicate(context, symbols, source, path,
-					node, SymbolKind::Library, identifier);
+				duplicate(context, symbols, units, source,
+					path, node, SymbolKind::Library, identifier);
 			}
 		}
 		"path" => match node.child_by_field_name("as") {
 			Some(node_as) if node_as.kind() == "signature" =>
 				node_as.child_by_field_name("identifier")
 					.into_iter().for_each(|node_as| function(context, symbols,
-					source, path, node, super::identifier(source, node_as))),
+					units, source, path, node, super::identifier(source, node_as))),
 			Some(node_as) if node_as.kind() == "static" =>
-				duplicate(context, symbols, source, path, node,
+				duplicate(context, symbols, units, source, path, node,
 					SymbolKind::Variable, super::field_identifier(source, node_as)),
-			_ => symbols.items.push(Item::Item((path.clone(), source.clone(), node))),
+			_ => units.push(Unit::Item(path.clone(), source.clone(), node)),
 		},
 		_ => (),
 	})
 }
 
-fn function<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
-				path: &Path, node: Node<'a>, identifier: S<Identifier>) {
+fn function<'a>(context: &Context, symbols: &mut Symbols<'a>, units: &mut Vec<Unit<'a>>,
+				source: &Source, path: &Path, node: Node<'a>, identifier: S<Identifier>) {
 	let path = path.push(identifier.node);
 	if let Some(other) = symbols.table.get(&path) {
 		if other.node != SymbolKind::Function {
@@ -226,21 +226,21 @@ fn function<'a>(context: &Context, symbols: &mut Symbols<'a>, source: &Source,
 				.label(identifier.span.label()).label(other.span.label()));
 		}
 	} else {
-		symbols.items.push(Item::Item((path.clone(), source.clone(), node)));
+		units.push(Unit::Item(path.clone(), source.clone(), node));
 		let symbol = S::new(SymbolKind::Function, identifier.span);
 		symbols.table.insert(path, symbol);
 	}
 }
 
 fn duplicate<'a>(context: &Context, symbols: &mut Symbols<'a>,
-				 source: &Source, path: &Path, node: Node<'a>,
-				 symbol: SymbolKind, identifier: S<Identifier>) {
+				 units: &mut Vec<Unit<'a>>, source: &Source, path: &Path,
+				 node: Node<'a>, symbol: SymbolKind, identifier: S<Identifier>) {
 	let path = path.push(identifier.node);
 	match symbols.table.get(&path) {
 		Some(other) => context.emit(Diagnostic::error().message("duplicate symbol")
 			.label(identifier.span.label()).label(other.span.label())),
 		None => {
-			symbols.items.push(Item::Item((path.clone(), source.clone(), node)));
+			units.push(Unit::Item(path.clone(), source.clone(), node));
 			symbols.table.insert(path, S::new(symbol, identifier.span));
 		}
 	}

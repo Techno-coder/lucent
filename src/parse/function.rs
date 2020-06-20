@@ -23,7 +23,7 @@ pub fn function(context: &Context, symbols: &mut Symbols,
 	scene.value.root = super::unit(&mut scene, value)?;
 	let value = scene.value;
 
-	let annotations = super::annotations(context, symbols, source, node)?;
+	let annotations = super::annotations(context, symbols, source, node);
 	Ok(Function { is_root, convention, annotations, parameters, return_type, value })
 }
 
