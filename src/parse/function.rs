@@ -11,6 +11,7 @@ use super::{Source, SymbolKind, Symbols};
 pub fn function(context: &Context, symbols: &mut Symbols,
 				source: &Source, node: Node) -> crate::Result<Function> {
 	let identifier = super::field_identifier(source, node);
+	let annotations = super::annotations(context, symbols, source, node);
 	let is_root = node.child_by_field_name("root").is_some();
 	let mut scene = Scene::new(context, symbols, source);
 
@@ -23,8 +24,15 @@ pub fn function(context: &Context, symbols: &mut Symbols,
 	scene.value.root = super::unit(&mut scene, value)?;
 	let value = scene.value;
 
-	let annotations = super::annotations(context, symbols, source, node);
-	Ok(Function { is_root, convention, annotations, parameters, return_type, value })
+	Ok(Function {
+		is_root,
+		convention,
+		annotations,
+		parameters,
+		return_type,
+		value,
+		identifier,
+	})
 }
 
 fn parameters(scene: &mut Scene, node: Node) -> crate::Result<Vec<S<Parameter>>> {

@@ -259,23 +259,7 @@ The node is directly copied into the function body at the point of inlining.
 module identifier
 	...
 ```
-Modules contains functions and global symbols. Multiple module blocks can be defined with the same name but no duplicate symbols are allowed:
-```
-module identifier
-	static symbol.0: type.0
-
-module identifier
-	static symbol.1: type.1
-```
-This is invalid:
-```
-module identifier
-	static symbol: type.0
-
-module identifier
-	static symbol: type.1
-```
-A symbol is considered duplicate if the same path has more than one possible symbol.
+Modules contains functions and global symbols. 
 
 ## Structures
 ```

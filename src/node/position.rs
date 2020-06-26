@@ -17,10 +17,8 @@ pub fn positions(context: &Context) {
 		Item::Symbol(symbol) => {
 			if let Some(module) = &stack.last().unwrap().parent {
 				let module = &mut context.modules.get_mut(module).unwrap();
+				if module.first.is_none() { module.first = Some(symbol.clone()); }
 				module.last = Some(symbol.clone());
-				if module.first.is_none() {
-					module.first = Some(symbol.clone());
-				}
 			}
 
 			match symbol {

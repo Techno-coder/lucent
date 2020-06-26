@@ -37,12 +37,12 @@ pub fn errors() -> Query {
 pub fn parse(context: &Context, path: &std::path::Path) -> crate::Result<()> {
 	let (mut symbols, units) = Symbols::root(context, path)?;
 	units.iter().map(|unit| match unit {
+		Unit::Item(path, source, node) => self::item(context,
+			&mut symbols, path.clone(), source, *node),
 		Unit::ModuleEnd => {
 			context.items.write().push(Item::ModuleEnd);
 			Ok(symbols.pop())
 		}
-		Unit::Item(path, source, node) => self::item(context,
-			&mut symbols, path.clone(), source, *node),
 	}).filter(Result::is_err).last().unwrap_or(Ok(()))
 }
 
@@ -62,7 +62,8 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 				super::node_type(context, symbols, source, node)).transpose()?;
 			let value = node.child_by_field_name("value").map(|node|
 				super::value(context, symbols, source, node)).transpose()?;
-			let variable = Static { identifier, node_type, value };
+			let annotations = annotations(context, symbols, source, node);
+			let variable = Static { annotations, identifier, node_type, value };
 
 			let symbol = Symbol::Variable(path.clone());
 			context.items.write().push(Item::Symbol(symbol));
@@ -107,8 +108,10 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 		"module" => {
 			let symbol = Symbol::Module(path.clone());
 			context.items.write().push(Item::Symbol(symbol));
+
+			let identifier = identifier(source, node);
 			let annotations = annotations(context, symbols, source, node);
-			let module = Module { annotations, first: None, last: None };
+			let module = Module { annotations, identifier, first: None, last: None };
 			context.modules.insert(path.clone(), module);
 
 			symbols.push();
@@ -121,15 +124,25 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 }
 
 pub fn annotations(context: &Context, symbols: &Symbols,
-				   source: &Source, node: Node) -> Vec<Annotation> {
+				   source: &Source, node: Node) -> Annotations {
 	let cursor = &mut node.walk();
-	node.children_by_field_name("annotation", cursor)
-		.map(|node| Ok(Annotation {
-			name: node.child_by_field_name("name")
-				.map(|node| identifier(source, node)).unwrap(),
-			value: super::value(context, symbols, source,
-				node.child_by_field_name("value").unwrap())?,
-		})).filter_map(crate::Result::ok).collect()
+	let mut annotations: Annotations = HashMap::new();
+	for node in node.children_by_field_name("annotation", cursor) {
+		let name = node.child_by_field_name("name")
+			.map(|node| identifier(source, node)).unwrap();
+		if let Some(other) = annotations.get(&name.node) {
+			context.emit(Diagnostic::error().message("duplicate annotation")
+				.label(other.span.label()).label(name.span.label()));
+		}
+
+		let value = super::value(context, symbols, source,
+			node.child_by_field_name("value").unwrap());
+		if let Ok(value) = value {
+			let value = S::new(value, name.span);
+			annotations.insert(name.node, value);
+		}
+	}
+	annotations
 }
 
 pub fn path(source: &Source, node: Node) -> S<Path> {

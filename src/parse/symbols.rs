@@ -124,7 +124,7 @@ fn file<'a>(context: &Context, symbols: &mut Symbols<'a>, units: &mut Vec<Unit<'
 	};
 
 	let key = Key::SymbolFile(canonical.unwrap());
-	context.symbol_files.ephemeral(None, key, span.clone(), || {
+	context.unit.ephemeral(None, key, span.clone(), || {
 		let file = file.parent().unwrap().to_owned();
 		let tree = super::parser().parse(text.as_bytes(), None).unwrap();
 		let source = super::Source { file: source, path: file, text };

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::Read;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -10,23 +10,25 @@ use parking_lot::{Mutex, RwLock};
 use crate::error::Diagnostic;
 use crate::generate::Section;
 use crate::inference::Types;
-use crate::node::{Function, Item, Module, Offsets, Path, Position, Static, Structure, Symbol};
+use crate::node::*;
 use crate::query::{QueryError, Table};
 use crate::span::Span;
 
 #[derive(Debug, Default)]
 pub struct Context {
+	pub unit: Table<()>,
 	pub files: RwLock<Files>,
-	pub symbol_files: Table<()>,
 	pub items: RwLock<Vec<Item>>,
 	pub modules: DashMap<Path, Module>,
 	pub statics: DashMap<Path, Static>,
 	pub structures: DashMap<Path, Structure>,
 	pub functions: DashMap<Path, Vec<Function>>,
 	pub positions: RwLock<HashMap<Symbol, Position>>,
+	pub present: RwLock<HashSet<FunctionPath>>,
 	pub type_contexts: Table<Types>,
 	pub sections: Table<Section>,
 	pub offsets: Table<Offsets>,
+	pub address: Table<usize>,
 	diagnostics: Mutex<Vec<Diagnostic>>,
 }
 

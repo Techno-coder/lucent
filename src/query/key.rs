@@ -1,6 +1,6 @@
 use crate::context::Context;
 use crate::error::Diagnostic;
-use crate::node::{FunctionPath, Path};
+use crate::node::{FunctionPath, Path, Symbol};
 use crate::query::QueryError;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -9,6 +9,10 @@ pub enum Key {
 	TypeFunction(FunctionPath),
 	TypeVariable(Path),
 	Offsets(Path),
+	TraverseRoots,
+	SymbolSize(Symbol),
+	LoadAddress(Symbol),
+	VirtualAddress(Symbol),
 	Generate(FunctionPath),
 }
 
@@ -18,7 +22,11 @@ impl Key {
 			Key::SymbolFile(_) => "in parsing symbols from file",
 			Key::TypeFunction(_) => "in type checking function",
 			Key::TypeVariable(_) => "in type checking static variable",
-			Key::Offsets(_) => "in computing structure offsets",
+			Key::Offsets(_) => "in deriving structure offsets",
+			Key::TraverseRoots => "in traversing root functions",
+			Key::SymbolSize(_) => "in deriving symbol size",
+			Key::LoadAddress(_) => "in deriving load address",
+			Key::VirtualAddress(_) => "in deriving virtual address",
 			Key::Generate(_) => "in generating function",
 		}
 	}

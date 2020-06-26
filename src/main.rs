@@ -2,6 +2,7 @@
 #![feature(entry_insert)]
 #![feature(never_type)]
 #![feature(concat_idents)]
+#![feature(bindings_after_at)]
 
 mod error;
 mod context;
@@ -25,13 +26,16 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 fn execute(context: &context::Context, path: &std::path::Path) -> Result<()> {
 	parse::parse(context, path)?;
 	node::positions(context);
-	dbg!(&context.positions);
-	dbg!(&context.modules);
+	node::present_all(context)?;
 
-	generate::x64::lower(context, None,
-		&crate::node::FunctionPath(crate::node::Path(vec![
-			crate::node::Identifier("Main".to_string()),
-			crate::node::Identifier("fibonacci".to_string()),
-		]), 0), None)?;
+	dbg!(node::address::size(context, None,
+		&node::Symbol::Function(node::FunctionPath(crate::node::Path(vec![
+			node::Identifier("Test".to_string()),
+			node::Identifier("fibonacci".to_string()),
+		]), 0)), Some(context.files.read().internal.clone()))?);
+	dbg!(node::address::size(context, None,
+		&node::Symbol::Module(crate::node::Path(vec![
+			node::Identifier("Test".to_string()),
+		])), Some(context.files.read().internal.clone()))?);
 	Ok(())
 }

@@ -63,20 +63,17 @@ impl fmt::Debug for Path {
 	}
 }
 
-#[derive(Debug)]
-pub struct Annotation {
-	pub name: S<Identifier>,
-	pub value: super::Value,
-}
+pub type Annotations = HashMap<Identifier, S<super::Value>>;
 
 #[derive(Debug)]
 pub struct Structure {
-	pub annotations: Vec<Annotation>,
+	pub annotations: Annotations,
 	pub fields: HashMap<Identifier, S<super::Type>>,
 }
 
 #[derive(Debug)]
 pub struct Static {
+	pub annotations: Annotations,
 	pub identifier: S<Identifier>,
 	pub node_type: Option<S<super::Type>>,
 	pub value: Option<super::Value>,
@@ -90,8 +87,9 @@ pub struct FunctionPath(pub Path, pub FunctionKind);
 #[derive(Debug)]
 pub struct Function {
 	pub is_root: bool,
+	pub annotations: Annotations,
+	pub identifier: S<Identifier>,
 	pub convention: Option<S<Identifier>>,
-	pub annotations: Vec<super::Annotation>,
 	pub parameters: Vec<S<Parameter>>,
 	pub return_type: S<ReturnType>,
 	pub value: super::Value,
@@ -111,7 +109,8 @@ pub enum Parameter {
 
 #[derive(Debug)]
 pub struct Module {
-	pub annotations: Vec<super::Annotation>,
+	pub annotations: Annotations,
+	pub identifier: S<Identifier>,
 	pub first: Option<Symbol>,
 	pub last: Option<Symbol>,
 }
