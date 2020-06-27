@@ -4,7 +4,7 @@ use std::sync::Arc;
 use iced_x86::{BlockEncoder, BlockEncoderOptions, Instruction, InstructionBlock};
 
 use crate::context::Context;
-use crate::generate::Section;
+use crate::generate::{Relative, Section};
 use crate::node::{FunctionPath, Size, Variable};
 use crate::query::{Key, QueryError};
 use crate::span::Span;
@@ -68,7 +68,7 @@ impl Scene {
 
 	pub fn label(&mut self) -> u64 {
 		self.next_label += 1;
-		self.next_label - 1
+		self.next_label
 	}
 }
 
@@ -97,6 +97,17 @@ pub fn lower(context: &Context, parent: Option<Key>, path: &FunctionPath,
 		let translation = translate(context, parent, path, span)?;
 		let block = InstructionBlock::new(&translation.instructions, 0);
 
+		// TODO: remove display code
+		use iced_x86::Formatter;
+		let buffer = &mut String::new();
+		let mut formatter = iced_x86::NasmFormatter::new();
+		for instruction in &translation.instructions {
+			formatter.format(instruction, buffer);
+			println!("{}", buffer);
+			buffer.clear();
+		}
+		println!();
+
 		let mut encoder = BlockEncoderOptions::RETURN_CONSTANT_OFFSETS;
 		encoder |= BlockEncoderOptions::RETURN_NEW_INSTRUCTION_OFFSETS;
 		let block = BlockEncoder::encode(64, block, encoder).unwrap_or_else(|error|
@@ -106,7 +117,12 @@ pub fn lower(context: &Context, parent: Option<Key>, path: &FunctionPath,
 		for (index, path) in translation.calls {
 			let offset = block.new_instruction_offsets[index] as usize;
 			let offset = offset + block.constant_offsets[index].immediate_offset();
-			section.relative.push((offset, Size::Double, path));
+			let target = block.new_instruction_offsets.get(index + 1).cloned()
+				.unwrap_or(block.code_buffer.len() as u32) as usize;
+
+			let size = Size::Double;
+			let relative = Relative { size, offset, path, target };
+			section.relative.push(relative);
 		}
 
 		section.bytes = block.code_buffer;
@@ -132,6 +148,16 @@ pub fn translate(context: &Context, parent: Option<Key>, path: &FunctionPath,
 	super::value(context, scene, &mut translation, &types,
 		&function.value, &function.value.root)?;
 	// TODO: return value
+
+	// TODO: remove special main
+	if function.identifier.node == crate::node::Identifier("main".to_string()) {
+		define_note!(note, translation, &function.identifier.span);
+		note(Instruction::with_reg_reg(iced_x86::Code::Mov_r64_rm64,
+			iced_x86::Register::RDI, iced_x86::Register::RAX));
+		note(Instruction::with_reg_i64(iced_x86::Code::Mov_r64_imm64,
+			iced_x86::Register::RAX, (2 << 24) | (!(0xff << 24) & 1)));
+		note(Instruction::with(iced_x86::Code::Syscall));
+	}
 
 	// TODO: Is the exit redundant?
 	super::exit(&mut translation, &internal);

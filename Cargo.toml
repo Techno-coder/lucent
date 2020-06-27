@@ -10,6 +10,11 @@ parking_lot = "^0.10"
 codespan-reporting = "^0.9"
 codespan = "^0.9"
 dashmap = "^3.0"
+goblin = "^0.2"
+
+[dependencies.scroll]
+version = "^0.10"
+features = ["derive"]
 
 [dependencies.iced-x86]
 version = "^1.2"

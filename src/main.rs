@@ -3,11 +3,14 @@
 #![feature(never_type)]
 #![feature(concat_idents)]
 #![feature(bindings_after_at)]
+#![feature(array_value_iter)]
 
 mod error;
+mod utility;
 mod context;
 mod inference;
 mod generate;
+mod binary;
 mod arena;
 mod query;
 mod parse;
@@ -27,11 +30,5 @@ fn execute(context: &context::Context, path: &std::path::Path) -> Result<()> {
 	parse::parse(context, path)?;
 	node::positions(context);
 	node::present_all(context)?;
-
-	dbg!(node::address::size(context, None,
-		&node::Symbol::Function(node::FunctionPath(crate::node::Path(vec![
-			node::Identifier("Main".to_string()),
-			node::Identifier("main".to_string()),
-		]), 0)), Some(context.files.read().internal.clone()))?);
-	Ok(())
+	binary::compile(context)
 }

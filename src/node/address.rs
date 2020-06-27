@@ -5,8 +5,11 @@ use crate::span::{S, Span};
 
 use super::{FunctionPath, Identifier, Symbol};
 
+pub type Address = usize;
+pub type SymbolSize = usize;
+
 pub fn load(context: &Context, parent: Option<Key>, symbol: &Symbol,
-			span: Option<Span>) -> crate::Result<usize> {
+			span: Option<Span>) -> crate::Result<Address> {
 	let key = Key::LoadAddress(symbol.clone());
 	context.address.scope(parent, key.clone(), span.clone(), || {
 		let targets = &[Identifier("load".to_string())];
@@ -32,7 +35,7 @@ pub fn load(context: &Context, parent: Option<Key>, symbol: &Symbol,
 }
 
 pub fn start(context: &Context, parent: Option<Key>, symbol: &Symbol,
-			 span: Option<Span>) -> crate::Result<usize> {
+			 span: Option<Span>) -> crate::Result<Address> {
 	let key = Key::VirtualAddress(symbol.clone());
 	context.address.scope(parent, key.clone(), span.clone(), || {
 		let load = Identifier("load".to_string());
@@ -60,13 +63,13 @@ pub fn start(context: &Context, parent: Option<Key>, symbol: &Symbol,
 }
 
 pub fn end(context: &Context, parent: Option<Key>, symbol: &Symbol,
-		   span: Option<Span>) -> crate::Result<usize> {
+		   span: Option<Span>) -> crate::Result<Address> {
 	let base = start(context, parent.clone(), symbol, span.clone())?;
 	Ok(base + size(context, parent, symbol, span)?)
 }
 
 pub fn size(context: &Context, parent: Option<Key>, symbol: &Symbol,
-			span: Option<Span>) -> crate::Result<usize> {
+			span: Option<Span>) -> crate::Result<SymbolSize> {
 	let key = Key::SymbolSize(symbol.clone());
 	context.address.scope(parent, key.clone(),
 		span.clone(), || match symbol {
@@ -88,15 +91,14 @@ pub fn size(context: &Context, parent: Option<Key>, symbol: &Symbol,
 		}).map(|size| *size)
 }
 
-fn align(other: &Symbol, symbol: &Symbol, address: usize) -> usize {
+fn align(other: &Symbol, symbol: &Symbol, address: Address) -> Address {
 	match (other, symbol) {
 		(Symbol::Function(_), Symbol::Function(_)) => address,
 		(Symbol::Variable(_), Symbol::Variable(_)) => address,
 		_ => {
 			// TODO: derive alignment from annotation
 			let alignment = 4 * 1024;
-			let padding = alignment - (address % alignment);
-			address + padding
+			crate::utility::ceiling(address, alignment)
 		}
 	}
 }

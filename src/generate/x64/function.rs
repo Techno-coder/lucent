@@ -34,7 +34,7 @@ pub fn exit(prime: &mut Translation, internal: &Span) {
 }
 
 pub fn set(prime: &mut Translation, path: &Type, _size: usize,
-		   memory: M, register: Register, span: &Span) {
+		   mut memory: M, register: Register, span: &Span) {
 	let code = match path {
 		Type::Truth => Code::Mov_rm8_r8,
 		Type::Rune => Code::Mov_rm32_r32,
@@ -51,46 +51,47 @@ pub fn set(prime: &mut Translation, path: &Type, _size: usize,
 		Type::Void | Type::Never => unreachable!(),
 	};
 
+	memory.displ_size = 1;
 	define_note!(note, prime, span);
 	note(I::with_mem_reg(code, memory, register));
 }
 
 pub fn push_value(prime: &mut Translation, path: &Type, span: &Span) -> Option<Register> {
-	let (code, register) = match path {
+	let (code, stack, register) = match path {
 		Type::Void | Type::Never => return None,
-		Type::Truth => (Code::Push_r16, Register::AX),
-		Type::Rune => (Code::Push_r32, Register::EAX),
+		Type::Truth => (Code::Push_r16, Register::AX, Register::AL),
+		Type::Rune => (Code::Push_r32, Register::EAX, Register::EAX),
 		Type::Array(_, _) | Type::Slice(_) | Type::Structure(_)
-		| Type::Pointer(_) => (Code::Push_r64, Register::RAX),
+		| Type::Pointer(_) => (Code::Push_r64, Register::RAX, Register::RAX),
 		Type::Signed(size) | Type::Unsigned(size) => match size {
-			Size::Byte => (Code::Push_r16, Register::AX),
-			Size::Word => (Code::Push_r16, Register::AX),
-			Size::Double => (Code::Push_r32, Register::EAX),
-			Size::Quad => (Code::Push_r64, Register::RAX),
+			Size::Byte => (Code::Push_r16, Register::AX, Register::AL),
+			Size::Word => (Code::Push_r16, Register::AX, Register::AX),
+			Size::Double => (Code::Push_r32, Register::EAX, Register::EAX),
+			Size::Quad => (Code::Push_r64, Register::RAX, Register::RAX),
 		}
 	};
 
 	define_note!(note, prime, span);
-	note(I::with_reg(code, register));
+	note(I::with_reg(code, stack));
 	Some(register)
 }
 
 pub fn alternate(prime: &mut Translation, path: &Type, span: &Span) -> Option<Register> {
-	let (code, alternate) = match path {
+	let (code, stack, alternate) = match path {
 		Type::Void | Type::Never => return None,
-		Type::Truth => (Code::Pop_r16, Register::BX),
-		Type::Rune => (Code::Pop_r32, Register::EBX),
+		Type::Truth => (Code::Pop_r16, Register::BX, Register::BL),
+		Type::Rune => (Code::Pop_r32, Register::EBX, Register::EBX),
 		Type::Array(_, _) | Type::Slice(_) | Type::Structure(_)
-		| Type::Pointer(_) => (Code::Pop_r64, Register::RBX),
+		| Type::Pointer(_) => (Code::Pop_r64, Register::RBX, Register::RBX),
 		Type::Signed(size) | Type::Unsigned(size) => match size {
-			Size::Byte => (Code::Pop_r16, Register::BX),
-			Size::Word => (Code::Pop_r16, Register::BX),
-			Size::Double => (Code::Pop_r32, Register::EBX),
-			Size::Quad => (Code::Pop_r64, Register::RBX),
+			Size::Byte => (Code::Pop_r16, Register::BX, Register::BL),
+			Size::Word => (Code::Pop_r16, Register::BX, Register::BX),
+			Size::Double => (Code::Pop_r32, Register::EBX, Register::EBX),
+			Size::Quad => (Code::Pop_r64, Register::RBX, Register::RBX),
 		}
 	};
 
 	define_note!(note, prime, span);
-	note(I::with_reg(code, alternate));
+	note(I::with_reg(code, stack));
 	Some(alternate)
 }
