@@ -1,9 +1,12 @@
-use crate::node::Path;
+use crate::node::{FunctionPath, Path, Size};
+
+pub type Offset = usize;
 
 #[derive(Debug, Default)]
 pub struct Section {
 	pub bytes: Vec<u8>,
-	pub intrinsics: Vec<(usize, Intrinsic)>,
+	pub relative: Vec<(Offset, Size, FunctionPath)>,
+	pub intrinsics: Vec<(Offset, Intrinsic)>,
 }
 
 #[derive(Debug)]

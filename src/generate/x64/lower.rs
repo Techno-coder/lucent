@@ -5,7 +5,7 @@ use iced_x86::{BlockEncoder, BlockEncoderOptions, Instruction, InstructionBlock}
 
 use crate::context::Context;
 use crate::generate::Section;
-use crate::node::{FunctionPath, Variable};
+use crate::node::{FunctionPath, Size, Variable};
 use crate::query::{Key, QueryError};
 use crate::span::Span;
 
@@ -13,6 +13,42 @@ macro_rules! define_note {
     ($note:ident, $prime:expr, $span:expr) => {
 		let $note = &mut |instruction| $prime.push(instruction, $span);
     };
+}
+
+macro_rules! register {
+    ($size:expr, $index:ident) => {{
+    	use iced_x86::Register::*;
+    	match $size {
+    		Size::Byte => concat_idents!($index, L),
+    		Size::Word => concat_idents!($index, X),
+    		Size::Double => concat_idents!(E, $index, X),
+    		Size::Quad => concat_idents!(R, $index, X),
+    	}
+    }};
+}
+
+macro_rules! code_m {
+    ($size:expr, $identifier:ident) => {{
+    	use iced_x86::Code::*;
+    	match $size {
+    		Size::Byte => concat_idents!($identifier, m8),
+    		Size::Word => concat_idents!($identifier, m16),
+    		Size::Double => concat_idents!($identifier, m32),
+    		Size::Quad => concat_idents!($identifier, m64),
+    	}
+    }};
+}
+
+macro_rules! code_rm {
+    ($size:expr, $left:ident, $right:ident) => {{
+    	use iced_x86::Code::*;
+    	match $size {
+    		Size::Byte => concat_idents!($left, r8, $right, m8),
+    		Size::Word => concat_idents!($left, r16, $right, m16),
+    		Size::Double => concat_idents!($left, r32, $right, m32),
+    		Size::Quad => concat_idents!($left, r64, $right, m64),
+    	}
+    }};
 }
 
 #[derive(Debug, Default)]
@@ -40,6 +76,7 @@ impl Scene {
 pub struct Translation {
 	pub pending_label: Option<u64>,
 	pub instructions: Vec<Instruction>,
+	pub calls: Vec<(usize, FunctionPath)>,
 	pub spans: Vec<Span>,
 }
 
@@ -58,22 +95,20 @@ pub fn lower(context: &Context, parent: Option<Key>, path: &FunctionPath,
 	context.sections.scope(parent, key.clone(), span.clone(), || {
 		let parent = Some(key.clone());
 		let translation = translate(context, parent, path, span)?;
-
-		// TODO: remove display code
-		use iced_x86::Formatter;
-		let buffer = &mut String::new();
-		let mut formatter = iced_x86::NasmFormatter::new();
-		for instruction in &translation.instructions {
-			formatter.format(instruction, buffer);
-			println!("{}", buffer);
-			buffer.clear();
-		}
-
-		// TODO: set instruction pointer
 		let block = InstructionBlock::new(&translation.instructions, 0);
-		let block = BlockEncoder::encode(64, block, BlockEncoderOptions::NONE).unwrap();
+
+		let mut encoder = BlockEncoderOptions::RETURN_CONSTANT_OFFSETS;
+		encoder |= BlockEncoderOptions::RETURN_NEW_INSTRUCTION_OFFSETS;
+		let block = BlockEncoder::encode(64, block, encoder).unwrap_or_else(|error|
+			panic!("encoding failure in: {:?}, where: {}", path, error));
 
 		let mut section = Section::default();
+		for (index, path) in translation.calls {
+			let offset = block.new_instruction_offsets[index] as usize;
+			let offset = offset + block.constant_offsets[index].immediate_offset();
+			section.relative.push((offset, Size::Double, path));
+		}
+
 		section.bytes = block.code_buffer;
 		Ok(section)
 	})

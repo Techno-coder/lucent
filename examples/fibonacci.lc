@@ -17,16 +17,3 @@ module Main
 			b = c
 			i += 1
 		b
-
-@load 2 * 1024 * 1024
-module Test
-	fn fibonacci(n: u64) u64
-		let i = 0
-		let a = 0
-		let b = 0
-		while i < n:
-			let c = a + b
-			a = b
-			b = c
-			i += 1
-		b

@@ -5,7 +5,7 @@ use iced_x86::MemoryOperand as M;
 use crate::context::Context;
 use crate::error::Diagnostic;
 use crate::inference::Types;
-use crate::node::{Binary, Size, Type, Value, ValueIndex, ValueNode};
+use crate::node::{Binary, FunctionPath, Size, Type, Value, ValueIndex, ValueNode};
 
 use super::{Scene, Translation};
 
@@ -24,17 +24,12 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			let offset = scene.variable(variable.node.clone(), size);
 			let memory = M::with_base_displ(Register::RBP, offset as i32);
 			super::set(prime, &types[index], size, memory, match types[index] {
-				Type::Truth => Register::AL,
-				Type::Rune => Register::EAX,
-				Type::Signed(size) | Type::Unsigned(size) => match size {
-					Size::Byte => Register::AL,
-					Size::Word => Register::AX,
-					Size::Double => Register::EAX,
-					Size::Quad => Register::RAX,
-				}
+				Type::Signed(size) | Type::Unsigned(size) => register!(size, A),
 				Type::Pointer(_) | Type::Slice(_) | Type::Array(_, _)
 				| Type::Structure(_) => Register::RAX,
 				Type::Void | Type::Never => return Ok(()),
+				Type::Truth => Register::AL,
+				Type::Rune => Register::EAX,
 			}, span);
 		}
 		ValueNode::Set(target, index) => {
@@ -65,11 +60,64 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			prime.pending_label = Some(exit);
 		}
 		ValueNode::When(_) => unimplemented!(),
-		ValueNode::Cast(_, _) => unimplemented!(),
+		ValueNode::Cast(index, target) => {
+			self::value(context, scene, prime, types, value, index)?;
+			define_note!(note, prime, span);
+			match (&types[index], &target.node) {
+				(Type::Unsigned(size), Type::Unsigned(node)) |
+				(Type::Unsigned(size), Type::Signed(node)) |
+				(Type::Signed(size), Type::Unsigned(node)) |
+				(Type::Signed(size), Type::Signed(node))
+				if size >= node => (),
+				(Type::Unsigned(size), Type::Signed(target)) |
+				(Type::Unsigned(size), Type::Unsigned(target))
+				=> note(I::with_reg_reg(match (size, target) {
+					(Size::Byte, Size::Word) => Code::Movzx_r16_rm8,
+					(Size::Byte, Size::Double) => Code::Movzx_r32_rm8,
+					(Size::Byte, Size::Quad) => Code::Movzx_r64_rm8,
+					(Size::Word, Size::Double) => Code::Movzx_r32_rm16,
+					(Size::Word, Size::Quad) => Code::Movzx_r64_rm16,
+					(Size::Double, Size::Quad) => return Ok(()),
+					_ => unreachable!(),
+				}, register!(target, A), register!(target, A))),
+				(Type::Signed(size), Type::Signed(target)) |
+				(Type::Signed(size), Type::Unsigned(target))
+				=> note(I::with_reg_reg(match (size, target) {
+					(Size::Byte, Size::Word) => Code::Movsx_r16_rm8,
+					(Size::Byte, Size::Double) => Code::Movsx_r32_rm8,
+					(Size::Byte, Size::Quad) => Code::Movsx_r64_rm8,
+					(Size::Word, Size::Double) => Code::Movsx_r32_rm16,
+					(Size::Word, Size::Quad) => Code::Movsx_r64_rm16,
+					(Size::Double, Size::Quad) => Code::Movsxd_r64_rm32,
+					_ => unreachable!(),
+				}, register!(target, A), register!(target, A))),
+				(path, node) => return context.pass(Diagnostic::error()
+					.label(span.label().with_message(path.to_string()))
+					.label(target.span.label().with_message(node.to_string()))
+					.message("cannot cast types")),
+			}
+		}
 		ValueNode::Return(_) => unimplemented!(),
 		ValueNode::Compile(_) => unimplemented!(),
 		ValueNode::Inline(_) => unimplemented!(),
-		ValueNode::Call(_, _) => unimplemented!(),
+		ValueNode::Call(path, arguments) => {
+			// TODO: provide argument for structure returns
+			let size = arguments.iter().rev().try_fold(0, |size, argument| {
+				// TODO: copy structures onto stack
+				self::value(context, scene, prime, types, value, argument)?;
+				super::push_value(prime, &types[argument], span).unwrap();
+				Ok(size + crate::node::size(context, scene.parent.clone(),
+					&types[argument], Some(span.clone()))?)
+			})? as i32;
+
+			let call_index = prime.instructions.len();
+			let (path, kind) = (path.node.clone(), types.functions[&index]);
+			prime.calls.push((call_index, FunctionPath(path, kind)));
+
+			define_note!(note, prime, span);
+			note(I::with_branch(Code::Call_rel32_64, 0));
+			note(I::with_reg_i32(Code::Add_rm64_imm32, Register::RSP, size));
+		}
 		ValueNode::Field(_, _) => unimplemented!(),
 		ValueNode::Create(_, _) => unimplemented!(),
 		ValueNode::Slice(_, _, _) => unimplemented!(),
@@ -98,12 +146,8 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 				Type::Truth => (Code::Mov_r8_rm8, Register::AL),
 				Type::Rune => (Code::Mov_r32_rm32, Register::EAX),
 				Type::Pointer(_) => (Code::Mov_r64_rm64, Register::RAX),
-				Type::Signed(size) | Type::Unsigned(size) => match size {
-					Size::Byte => (Code::Mov_r8_rm8, Register::AL),
-					Size::Word => (Code::Mov_r16_rm16, Register::AX),
-					Size::Double => (Code::Mov_r32_rm32, Register::EAX),
-					Size::Quad => (Code::Mov_r64_rm64, Register::RAX),
-				}
+				Type::Signed(size) | Type::Unsigned(size) =>
+					(code_rm!(size, Mov_, _r), register!(size, A)),
 				Type::Slice(_) | Type::Array(_, _) |
 				Type::Structure(_) => (Code::Lea_r64_m, Register::RAX)
 			};
@@ -114,27 +158,21 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 		ValueNode::String(_) => unimplemented!(),
 		ValueNode::Register(_) => unimplemented!(),
 		ValueNode::Array(_) => unimplemented!(),
-		ValueNode::Integral(integral) => {
-			let size = match types[index] {
-				Type::Signed(size) => size,
-				Type::Unsigned(size) => size,
-				_ => panic!("type is not integral"),
-			};
-
-			let (code, register) = match size {
-				Size::Byte => (Code::Mov_r8_imm8, Register::AL),
-				Size::Word => (Code::Mov_r16_imm16, Register::AX),
-				Size::Double => (Code::Mov_r32_imm32, Register::EAX),
-				Size::Quad => (Code::Mov_r64_imm64, Register::RAX),
-			};
-
-			let integral = *integral as i64;
-			note(I::with_reg_i64(code, register, integral));
-		}
+		ValueNode::Integral(integral) => match types[index] {
+			Type::Signed(size) | Type::Unsigned(size) => {
+				let integral = *integral as i64;
+				let register = register!(size, A);
+				let code = code_rm!(size, Mov_, _im);
+				note(I::with_reg_i64(code, register, integral));
+			}
+			_ => panic!("type is not integral"),
+		},
 		ValueNode::Truth(truth) =>
-			note(I::with_reg_u32(Code::Mov_r8_imm8, Register::AL, *truth as u32)),
+			note(I::with_reg_u32(Code::Mov_r8_imm8,
+				Register::AL, *truth as u32)),
 		ValueNode::Rune(rune) =>
-			note(I::with_reg_u32(Code::Mov_r32_imm32, Register::EAX, *rune as u32)),
+			note(I::with_reg_u32(Code::Mov_r32_imm32,
+				Register::EAX, *rune as u32)),
 		ValueNode::Break => unimplemented!(),
 	})
 }

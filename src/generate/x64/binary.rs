@@ -23,12 +23,8 @@ pub fn binary(context: &Context, scene: &mut Scene, prime: &mut Translation,
 				Type::Truth => Code::Cmp_r8_rm8,
 				Type::Rune => Code::Cmp_r32_rm32,
 				Type::Pointer(_) => Code::Cmp_r64_rm64,
-				Type::Signed(size) | Type::Unsigned(size) => match size {
-					Size::Byte => Code::Cmp_r8_rm8,
-					Size::Word => Code::Cmp_r16_rm16,
-					Size::Double => Code::Cmp_r32_rm32,
-					Size::Quad => Code::Cmp_r64_rm64,
-				}
+				Type::Signed(size) => code_rm!(size, Cmp_, _r),
+				Type::Unsigned(size) => code_rm!(size, Cmp_, _r),
 				other => panic!("invalid comparison type: {}", other),
 			};
 
@@ -42,22 +38,63 @@ pub fn binary(context: &Context, scene: &mut Scene, prime: &mut Translation,
 				Compare::Equal => Code::Sete_rm8,
 			}, Register::AL));
 		}
-		Binary::Dual(dual) => {
-			let code = match dual {
-				Dual::Add => match &types[left] {
-					Type::Signed(size) | Type::Unsigned(size) => match size {
-						Size::Byte => Code::Add_r8_rm8,
-						Size::Word => Code::Add_r16_rm16,
-						Size::Double => Code::Add_r32_rm32,
-						Size::Quad => Code::Add_r64_rm64,
-					},
-					Type::Pointer(_) => unimplemented!(),
+		Binary::Dual(dual @ Dual::Divide) |
+		Binary::Dual(dual @ Dual::Modulo) |
+		Binary::Dual(dual @ Dual::Multiply) => {
+			if dual != &Dual::Multiply {
+				note(match &types[left] {
+					Type::Signed(size) => I::with(match size {
+						Size::Byte => Code::Cbw,
+						Size::Word => Code::Cwd,
+						Size::Double => Code::Cdq,
+						Size::Quad => Code::Cqo,
+					}),
+					Type::Unsigned(size) => {
+						let register = register!(size, D);
+						let code = code_rm!(size, Xor_, _r);
+						I::with_reg_reg(code, register, register)
+					}
+					other => panic!("invalid arithmetic type: {}", other),
+				})
+			}
+
+			note(I::with_reg(match dual {
+				Dual::Multiply => match &types[left] {
+					Type::Signed(size) => code_m!(size, Imul_r),
+					Type::Unsigned(size) => code_m!(size, Mul_r),
 					other => panic!("invalid arithmetic type: {}", other),
 				}
-				_ => unimplemented!(),
-			};
+				Dual::Divide | Dual::Modulo => match &types[left] {
+					Type::Signed(size) => code_m!(size, Idiv_r),
+					Type::Unsigned(size) => code_m!(size, Div_r),
+					other => panic!("invalid arithmetic type: {}", other),
+				}
+				_ => unreachable!(),
+			}, alternate));
 
-			note(I::with_reg_reg(code, register, alternate));
+			if dual == &Dual::Modulo {
+				let size = match &types[left] {
+					Type::Signed(size) | Type::Unsigned(size) => size,
+					other => panic!("invalid arithmetic type: {}", other),
+				};
+
+				let alternate = register!(size, D);
+				let code = code_rm!(size, Mov_, _r);
+				note(I::with_reg_reg(code, register, alternate));
+			}
+		}
+		Binary::Dual(dual) => {
+			note(I::with_reg_reg(match dual {
+				Dual::Add => match &types[left] {
+					Type::Pointer(_) => unimplemented!(),
+					Type::Signed(size) => code_rm!(size, Add_, _r),
+					Type::Unsigned(size) => code_rm!(size, Add_, _r),
+					other => panic!("invalid arithmetic type: {}", other),
+				}
+				Dual::Divide | Dual::Modulo |
+				Dual::Multiply => unreachable!(),
+				_ => unimplemented!(),
+			}, register, alternate));
 		}
 		_ => unimplemented!()
 	})

@@ -30,12 +30,8 @@ fn execute(context: &context::Context, path: &std::path::Path) -> Result<()> {
 
 	dbg!(node::address::size(context, None,
 		&node::Symbol::Function(node::FunctionPath(crate::node::Path(vec![
-			node::Identifier("Test".to_string()),
-			node::Identifier("fibonacci".to_string()),
+			node::Identifier("Main".to_string()),
+			node::Identifier("main".to_string()),
 		]), 0)), Some(context.files.read().internal.clone()))?);
-	dbg!(node::address::size(context, None,
-		&node::Symbol::Module(crate::node::Path(vec![
-			node::Identifier("Test".to_string()),
-		])), Some(context.files.read().internal.clone()))?);
 	Ok(())
 }
