@@ -167,8 +167,8 @@ pub fn value(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariable
 			let mut value = Value::default();
 			let size = ValueNode::Integral(string.len() as i128);
 			value.root = value.insert(S::new(size, span.clone()));
-			let rune = S::new(Type::Rune, span.clone());
-			let node = Type::Array(Box::new(rune), value);
+			let element = S::new(Type::Unsigned(Size::Byte), span.clone());
+			let node = Type::Array(Box::new(element), value);
 			scene.ascribe(index, S::new(node, span.clone()))
 		}
 		ValueNode::Register(_) => {

@@ -58,7 +58,7 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 
 			define_note!(note, prime, span);
 			note(I::with_branch(Code::Jmp_rel32_64, entry));
-			prime.pending_label = Some(exit);
+			prime.set_pending_label(exit, span);
 		}
 		ValueNode::When(branches) => {
 			let mut complete = false;
@@ -78,7 +78,7 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			if !complete { note(I::with_branch(Code::Jmp_rel32_64, exit)); }
 			let iterator = Iterator::zip(labels?.into_iter(), branches.iter());
 			for (index, (label, (_, branch))) in iterator.enumerate() {
-				prime.pending_label = Some(label);
+				prime.set_pending_label(label, span);
 				self::value(context, scene, prime, types, value, branch)?;
 
 				if index + 1 != branches.len() {
@@ -87,47 +87,10 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 				}
 			}
 
-			let exit = Some(exit);
-			prime.pending_label = exit;
+			prime.set_pending_label(exit, span);
 		}
-		ValueNode::Cast(index, target) => {
-			self::value(context, scene, prime, types, value, index)?;
-			define_note!(note, prime, span);
-			match (&types[index], &target.node) {
-				(Type::Unsigned(size), Type::Unsigned(node)) |
-				(Type::Unsigned(size), Type::Signed(node)) |
-				(Type::Signed(size), Type::Unsigned(node)) |
-				(Type::Signed(size), Type::Signed(node))
-				if size >= node => (),
-				(Type::Unsigned(size), Type::Signed(target)) |
-				(Type::Unsigned(size), Type::Unsigned(target))
-				=> note(I::with_reg_reg(match (size, target) {
-					(Size::Byte, Size::Word) => Code::Movzx_r16_rm8,
-					(Size::Byte, Size::Double) => Code::Movzx_r32_rm8,
-					(Size::Byte, Size::Quad) => Code::Movzx_r64_rm8,
-					(Size::Word, Size::Double) => Code::Movzx_r32_rm16,
-					(Size::Word, Size::Quad) => Code::Movzx_r64_rm16,
-					(Size::Double, Size::Quad) => return Ok(()),
-					_ => unreachable!(),
-				}, register!(target, A), register!(target, A))),
-				(Type::Signed(size), Type::Signed(target)) |
-				(Type::Signed(size), Type::Unsigned(target))
-				=> note(I::with_reg_reg(match (size, target) {
-					(Size::Byte, Size::Word) => Code::Movsx_r16_rm8,
-					(Size::Byte, Size::Double) => Code::Movsx_r32_rm8,
-					(Size::Byte, Size::Quad) => Code::Movsx_r64_rm8,
-					(Size::Word, Size::Double) => Code::Movsx_r32_rm16,
-					(Size::Word, Size::Quad) => Code::Movsx_r64_rm16,
-					(Size::Double, Size::Quad) => Code::Movsxd_r64_rm32,
-					_ => unreachable!(),
-				}, register!(target, A), register!(target, A))),
-				// TODO: other casts
-				(path, node) => return context.pass(Diagnostic::error()
-					.label(span.label().with_message(path.to_string()))
-					.label(target.span.label().with_message(node.to_string()))
-					.message("cannot cast types")),
-			}
-		}
+		ValueNode::Cast(index, target) => super::cast(context,
+			scene, prime, types, value, index, target, span)?,
 		ValueNode::Return(index) => render(context,
 			scene, prime, types, value, *index, span)?,
 		ValueNode::Compile(_) => unimplemented!(),

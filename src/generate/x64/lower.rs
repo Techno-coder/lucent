@@ -28,13 +28,13 @@ macro_rules! register {
 }
 
 macro_rules! code_m {
-    ($size:expr, $identifier:ident) => {{
+    ($size:expr, $identifier:ident $(,$other:ident)*) => {{
     	use iced_x86::Code::*;
     	match $size {
-    		Size::Byte => concat_idents!($identifier, m8),
-    		Size::Word => concat_idents!($identifier, m16),
-    		Size::Double => concat_idents!($identifier, m32),
-    		Size::Quad => concat_idents!($identifier, m64),
+    		Size::Byte => concat_idents!($identifier, m8, $($other,)*),
+    		Size::Word => concat_idents!($identifier, m16, $($other,)*),
+    		Size::Double => concat_idents!($identifier, m32, $($other,)*),
+    		Size::Quad => concat_idents!($identifier, m64, $($other,)*),
     	}
     }};
 }
@@ -81,6 +81,16 @@ pub struct Translation {
 }
 
 impl Translation {
+	pub fn set_pending_label(&mut self, label: u64, span: &Span) {
+		if self.pending_label.is_some() {
+			let code = iced_x86::Code::Nopw;
+			self.push(Instruction::with(code), span);
+		}
+
+		assert!(self.pending_label.is_none());
+		self.pending_label = Some(label);
+	}
+
 	pub fn push(&mut self, mut instruction: Instruction, span: &Span) {
 		self.pending_label.take().into_iter()
 			.for_each(|label| instruction.set_ip(label));
@@ -165,6 +175,12 @@ pub fn translate(context: &Context, parent: Option<Key>, path: &FunctionPath,
 		&function.value, Some(function.value.root), &internal)?;
 
 	let frame_size = -scene.next_offset as i32;
-	translation.instructions[2].set_immediate_i32(1, frame_size);
+	if frame_size != 0 {
+		translation.instructions[2].set_immediate_i32(1, frame_size);
+	} else {
+		translation.instructions.remove(2);
+		translation.calls.iter_mut().for_each(|(index, _)| *index -= 1);
+	}
+
 	Ok(translation)
 }
