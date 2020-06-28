@@ -13,6 +13,18 @@ pub fn compile(context: &Context) -> crate::Result<()> {
 	super::patch(context, &mut entries)?;
 	let segments = super::segments(entries);
 
+	for segment in &segments {
+		match &segment.kind {
+			super::SegmentKind::Text(data) => {
+				for byte in data.iter().flatten() {
+					print!("{:02x} ", byte);
+				}
+				println!();
+			}
+			_ => (),
+		}
+	}
+
 	// TODO: derive format from global annotation
 	let data = super::format::mach::compile(segments);
 

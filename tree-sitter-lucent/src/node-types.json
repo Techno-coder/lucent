@@ -3124,6 +3124,10 @@
     "named": false
   },
   {
+    "type": "if",
+    "named": false
+  },
+  {
     "type": "inline",
     "named": false
   },

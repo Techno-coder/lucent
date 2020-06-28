@@ -145,14 +145,20 @@ static identifier = value
 ```
 Values assigned to a static variable are evaluated at compilation time.
 
-## When expressions
+## If expressions
 ```
-when condition: 
+if condition: 
 	statement.0
 	statement.1
 	...
 ```
-When expressions are similar to a typical if statement. Multiple branches are collated under a single expression:
+If expressions can only have a single branch. Branches with a single statement can be collapsed into a single line:
+```
+if condition: statement.0
+```
+
+## When expressions
+When expressions are similar to if expressions. Multiple branches are collated under a single expression:
 ```
 when:
 	condition.0:
@@ -165,10 +171,8 @@ when:
 	true:
 		...
 ```
-Branches with a single statement can be collapsed into a single line:
-```
-when condition: statement.0
-```
+
+If no branch exists with a `true` condition then the type of the expression is `void`. Otherwise, it is the type of the expression in each branch.
 
 ## While loops
 ```

@@ -1,6 +1,6 @@
-@@binary flat
+@@binary "flat"
 @load 1024 * 1024
-@architecture x86
+@architecture "x86"
 module Loader
 	module Header
 		static MAGIC: u32 = 0xe85250d6
@@ -21,7 +21,7 @@ module Loader
 			check_multiboot()
 
 		fn check_multiboot()
-			when $eax != 0x36d76289:
+			if $eax != 0x36d76289:
 				no_multiboot(0)
 
 		fn no_multiboot(code: u8) never

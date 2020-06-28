@@ -36,30 +36,38 @@ pub fn value(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariable
 			scene.ascribe(index, S::new(Type::Void, span.clone()))
 		}
 		ValueNode::When(branches) => {
-			let ((condition, first), rest) = branches.split_first().unwrap();
-			let variable = self::value(context, scene, place, value, first)?;
-			let _ = truth_type(context, scene, place, value, condition);
+			branches.iter().map(|(condition, _)| truth_type(context, scene,
+				place, value, condition)).for_each(|variable| std::mem::drop(variable));
+			let default = |condition| matches!(condition, &ValueNode::Truth(true));
+			if !branches.iter().any(|(condition, _)| default(&value[*condition].node)) {
+				branches.iter().map(|(_, index)| self::value(context, scene,
+					place, value, index)).for_each(|variable| std::mem::drop(variable));
+				return Ok(scene.ascribe(index, S::new(Type::Void, span.clone())));
+			}
 
+			let ((_, first), slice) = branches.split_first().unwrap();
+			let variable = self::value(context, scene, place, value, first)?;
 			let first_span = &value[*first].span;
-			for (condition, node) in rest {
-				let _ = truth_type(context, scene, place, value, condition);
+			for (_, node) in slice {
 				let other = self::value(context, scene, place, value, node)?;
 				scene.unify(context, variable, other, first_span, &value[*node].span);
 			}
-			variable
+
+			let entry = scene.values.entry(*index);
+			*entry.insert(variable).get()
 		}
 		ValueNode::Cast(node, target) => {
 			let _ = self::value(context, scene, place, value, node);
 			scene.ascribe(index, target.clone())
 		}
 		ValueNode::Return(node) => {
-			let place_node = place.ok_or(context.error(Diagnostic::error()
+			let place_node = place.ok_or_else(|| context.error(Diagnostic::error()
 				.message("cannot return within enclosing item").label(span.label())))?;
 			let node = node.as_ref().map(|index| self::value(context,
 				scene, place, value, index)).transpose()?.unwrap_or_else(||
 				scene.next_with(Terminal::Type(S::new(Type::Void, span.clone()))));
 			scene.unify(context, node, place_node.node, span, &place_node.span);
-			scene.ascribe(index, S::new(Type::Void, span.clone()))
+			scene.ascribe(index, S::new(Type::Never, span.clone()))
 		}
 		ValueNode::Compile(node) => {
 			let node = self::value(context, scene, place, value, node)?;
@@ -115,7 +123,7 @@ pub fn value(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariable
 				let right_node = self::value(context, scene, place, value, right)?;
 				let (left_span, right_span) = (&value[*left].span, &value[*right].span);
 				scene.unify(context, left_node, right_node, left_span, right_span);
-				*scene.values.entry(*index).insert(left_node).get()
+				scene.ascribe(index, S::new(Type::Truth, span.clone()))
 			}
 			Binary::And | Binary::Or => {
 				let _ = truth_type(context, scene, place, value, left);

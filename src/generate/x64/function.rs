@@ -27,12 +27,6 @@ pub fn parameters(context: &Context, function: &Function,
 	})
 }
 
-pub fn exit(prime: &mut Translation, internal: &Span) {
-	define_note!(note, prime, internal);
-	note(I::with(Code::Leaveq));
-	note(I::with(Code::Retnq));
-}
-
 pub fn set(prime: &mut Translation, path: &Type, _size: usize,
 		   mut memory: M, register: Register, span: &Span) {
 	let code = match path {

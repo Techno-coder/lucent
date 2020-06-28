@@ -6,6 +6,7 @@ use crate::context::Context;
 use crate::error::Diagnostic;
 use crate::inference::Types;
 use crate::node::{Binary, FunctionPath, Size, Type, Value, ValueIndex, ValueNode};
+use crate::span::Span;
 
 use super::{Scene, Translation};
 
@@ -59,7 +60,36 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			note(I::with_branch(Code::Jmp_rel32_64, entry));
 			prime.pending_label = Some(exit);
 		}
-		ValueNode::When(_) => unimplemented!(),
+		ValueNode::When(branches) => {
+			let mut complete = false;
+			let labels: Result<Vec<_>, _> = branches.iter().map(|(condition, _)| {
+				self::value(context, scene, prime, types, value, condition)?;
+				complete |= matches!(value[*condition].node, ValueNode::Truth(true));
+
+				let label = scene.label();
+				define_note!(note, prime, span);
+				note(I::with_reg_reg(Code::Test_rm8_r8, Register::AL, Register::AL));
+				note(I::with_branch(Code::Jne_rel32_64, label));
+				Ok(label)
+			}).collect();
+
+			let exit = scene.label();
+			define_note!(note, prime, span);
+			if !complete { note(I::with_branch(Code::Jmp_rel32_64, exit)); }
+			let iterator = Iterator::zip(labels?.into_iter(), branches.iter());
+			for (index, (label, (_, branch))) in iterator.enumerate() {
+				prime.pending_label = Some(label);
+				self::value(context, scene, prime, types, value, branch)?;
+
+				if index + 1 != branches.len() {
+					define_note!(note, prime, span);
+					note(I::with_branch(Code::Jmp_rel32_64, exit));
+				}
+			}
+
+			let exit = Some(exit);
+			prime.pending_label = exit;
+		}
 		ValueNode::Cast(index, target) => {
 			self::value(context, scene, prime, types, value, index)?;
 			define_note!(note, prime, span);
@@ -91,13 +121,15 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 					(Size::Double, Size::Quad) => Code::Movsxd_r64_rm32,
 					_ => unreachable!(),
 				}, register!(target, A), register!(target, A))),
+				// TODO: other casts
 				(path, node) => return context.pass(Diagnostic::error()
 					.label(span.label().with_message(path.to_string()))
 					.label(target.span.label().with_message(node.to_string()))
 					.message("cannot cast types")),
 			}
 		}
-		ValueNode::Return(_) => unimplemented!(),
+		ValueNode::Return(index) => render(context,
+			scene, prime, types, value, *index, span)?,
 		ValueNode::Compile(_) => unimplemented!(),
 		ValueNode::Inline(_) => unimplemented!(),
 		ValueNode::Call(path, arguments) => {
@@ -117,6 +149,7 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			define_note!(note, prime, span);
 			note(I::with_branch(Code::Call_rel32_64, 0));
 			note(I::with_reg_i32(Code::Add_rm64_imm32, Register::RSP, size));
+			// TODO: set structure return as pointer
 		}
 		ValueNode::Field(_, _) => unimplemented!(),
 		ValueNode::Create(_, _) => unimplemented!(),
@@ -175,4 +208,18 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 				Register::EAX, *rune as u32)),
 		ValueNode::Break => unimplemented!(),
 	})
+}
+
+pub fn render(context: &Context, scene: &mut Scene, prime: &mut Translation,
+			  types: &Types, value: &Value, index: Option<ValueIndex>,
+			  span: &Span) -> crate::Result<()> {
+	if let Some(index) = index {
+		// TODO: return large value by pointer set
+		self::value(context, scene, prime, types, value, &index)?;
+	}
+
+	define_note!(note, prime, span);
+	note(I::with(Code::Leaveq));
+	note(I::with(Code::Retnq));
+	Ok(())
 }

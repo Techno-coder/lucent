@@ -129,16 +129,6 @@ pub enum Size {
 }
 
 impl Size {
-	pub fn new(bytes: usize) -> Option<Self> {
-		Some(match bytes {
-			1 => Size::Byte,
-			2 => Size::Word,
-			4 => Size::Double,
-			8 => Size::Quad,
-			_ => return None,
-		})
-	}
-
 	pub fn bytes(self) -> usize {
 		(self as usize) / 8
 	}

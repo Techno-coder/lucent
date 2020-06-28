@@ -142,25 +142,28 @@ pub fn translate(context: &Context, parent: Option<Key>, path: &FunctionPath,
 	let mut translation = Translation::default();
 	let scene = &mut Scene { parent, ..Scene::default() };
 	let internal = context.files.read().internal.clone();
+
 	super::entry(&mut translation, &internal);
 	super::parameters(context, function, scene)?;
 
-	super::value(context, scene, &mut translation, &types,
-		&function.value, &function.value.root)?;
-	// TODO: return value
-
 	// TODO: remove special main
 	if function.identifier.node == crate::node::Identifier("main".to_string()) {
+		super::value(context, scene, &mut translation,
+			&types, &function.value, &function.value.root)?;
 		define_note!(note, translation, &function.identifier.span);
 		note(Instruction::with_reg_reg(iced_x86::Code::Mov_r64_rm64,
 			iced_x86::Register::RDI, iced_x86::Register::RAX));
 		note(Instruction::with_reg_i64(iced_x86::Code::Mov_r64_imm64,
 			iced_x86::Register::RAX, (2 << 24) | (!(0xff << 24) & 1)));
 		note(Instruction::with(iced_x86::Code::Syscall));
+		let frame_size = -scene.next_offset as i32;
+		translation.instructions[2].set_immediate_i32(1, frame_size);
+		return Ok(translation);
 	}
 
-	// TODO: Is the exit redundant?
-	super::exit(&mut translation, &internal);
+	super::render(context, scene, &mut translation, &types,
+		&function.value, Some(function.value.root), &internal)?;
+
 	let frame_size = -scene.next_offset as i32;
 	translation.instructions[2].set_immediate_i32(1, frame_size);
 	Ok(translation)

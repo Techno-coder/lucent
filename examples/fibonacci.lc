@@ -1,7 +1,7 @@
-@@binary MachO
+@@binary "MachO"
 @@entry Intrinsic.start(Main.main)
 
-// @architecture x64
+@architecture "x64"
 @load 1024 * 1024
 module Main
 	root fn main() u8
@@ -16,4 +16,4 @@ module Main
 			a = b
 			b = c
 			i += 1
-		b
+		return b

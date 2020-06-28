@@ -88,6 +88,8 @@ impl Scene {
 				self.terminals.remove(&right);
 			}
 			(Some(left), Some(right)) if Terminal::equal(context, left, right) => (),
+			(Some(Terminal::Type(S { node: Type::Never, .. })), Some(_)) |
+			(Some(_), Some(Terminal::Type(S { node: Type::Never, .. }))) => (),
 			(Some(Terminal::Type(S { node: Type::Array(left, _left_size), .. })),
 				Some(Array(right, _right_size))) => {
 				// TODO: perform size equality check

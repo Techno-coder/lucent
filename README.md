@@ -16,9 +16,9 @@ module Loader
             (0xe85250d6 + HEADER_LENGTH)
 
         module EndTag
-            static Type: u16 = 0
-            static Flags: u16 = 0
-            static Size: u32 = 8
+            static TYPE: u16 = 0
+            static FLAGS: u16 = 0
+            static SIZE: u32 = 8
             
     module Main
         root fn start()
@@ -26,7 +26,7 @@ module Loader
             check_multiboot()
 
         fn check_multiboot()
-            when $eax != 0x36d76289:
+            if $eax != 0x36d76289:
                 no_multiboot(0)
 
         fn no_multiboot(code: u8) never

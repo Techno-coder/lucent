@@ -31,8 +31,8 @@ pub fn compile(segments: Vec<Segment>) -> io::Result<Vec<u8>> {
 
 		match segment.kind {
 			SegmentKind::Text(data) | SegmentKind::Data(data) => data
-				.into_iter().map(|data| bytes.write(&data)).try_for_each(|bytes|
-				bytes.map(|bytes| offset += bytes))?,
+				.into_iter().try_for_each(|data| bytes.write(&data)
+				.map(|bytes| offset += bytes))?,
 			SegmentKind::Reserve(_) => (),
 		}
 	}
@@ -66,8 +66,8 @@ fn segments(segments: &[Segment]) -> Vec<load_command::SegmentCommand64> {
 		SegmentKind::Text(data) => {
 			let size = data.iter().map(Vec::len).sum::<usize>() as u64;
 			BinarySegment::default().name(b"__TEXT")
-				.address(segment.address as u64).size(size)
-				.file_size(size).protections(constants::VM_PROT_EXECUTE | constants::VM_PROT_READ)
+				.address(segment.address as u64).size(size).file_size(size)
+				.protections(constants::VM_PROT_EXECUTE | constants::VM_PROT_READ)
 		}
 		SegmentKind::Data(data) => {
 			let size = data.iter().map(Vec::len).sum::<usize>() as u64;

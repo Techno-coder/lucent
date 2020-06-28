@@ -181,10 +181,10 @@ module.exports = grammar({
         'return': $ => seq('return',
             field('value', optional($._expression))),
 
-        when: $ => seq('when', choice(
-            seq(':', $._open, repeat1($.branch), $._close),
-            $.branch,
-        )),
+        when: $ => choice(
+            seq('when', ':', $._open, repeat1($.branch), $._close),
+            seq('if', $.branch),
+        ),
 
         branch: $ => seq(
             field('condition', $._value),

@@ -185,6 +185,22 @@ fn function()
 		(unary (unary (path (identifier)))))))
 
 =====================================
+If expressions
+=====================================
+
+fn function()
+	if true: true
+	if true:
+		true
+
+---
+
+(source (function
+	(identifier) (block
+		(when (branch (truth) (block (truth))))
+		(when (branch (truth) (block (truth)))))))
+
+=====================================
 When expressions
 =====================================
 
@@ -192,8 +208,6 @@ fn function()
 	let variable = when:
 		false: 0
 		true: 1
-	when true:
-		true
 
 ---
 
@@ -201,8 +215,7 @@ fn function()
 	(identifier) (block
 		(let (identifier) (when
 			(branch (truth) (block (integral)))
-			(branch (truth) (block (integral)))))
-		(when (branch (truth) (block (truth)))))))
+			(branch (truth) (block (integral))))))))
 
 =====================================
 While loops
