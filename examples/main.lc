@@ -1,6 +1,6 @@
 @@binary "flat"
 @load 1024 * 1024
-@architecture "x86"
+@architecture "x32"
 module Loader
 	module Header
 		static MAGIC: u32 = 0xe85250d6

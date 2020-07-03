@@ -61,7 +61,7 @@ fn function() truth = true
 	item: (function
 		identifier: (identifier)
 		return: (path (identifier))
-		block: (block (truth))))
+		block: (truth)))
 
 =====================================
 Calling conventions
@@ -76,7 +76,7 @@ cdecl fn function() truth = true
 		convention: (identifier)
 		identifier: (identifier)
 		return: (path (identifier))
-		block: (block (truth))))
+		block: (truth)))
 
 =====================================
 Root functions
@@ -91,7 +91,7 @@ root fn function() truth = true
 		root: (root)
 		identifier: (identifier)
 		return: (path (identifier))
-		block: (block (truth))))
+		block: (truth)))
 
 =====================================
 Static variables

@@ -1,15 +1,15 @@
-@@binary "MachO"
+@@binary "mach-o"
 @@entry Intrinsic.start(Main.main)
 
 @architecture "x64"
 @load 1024 * 1024
 module Main
 	root fn main() u8
-		(fibonacci(45) % 100) as u8
+		(fibonacci(46) % 100) as u8
 
 	fn fibonacci(n: u64) u64
 		let i = 0
-		let a = 1
+		let a = 0
 		let b = 1
 		while i < n:
 			let c = a + b
@@ -17,3 +17,7 @@ module Main
 			b = c
 			i += 1
 		return b
+
+	fn fibonacci'(n: u64) u64
+		if n <= 1: return 1
+		fibonacci'(n - 1) + fibonacci'(n - 2)

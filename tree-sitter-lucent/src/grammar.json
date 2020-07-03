@@ -764,7 +764,7 @@
                   "name": "block",
                   "content": {
                     "type": "SYMBOL",
-                    "name": "_line_block"
+                    "name": "_value"
                   }
                 }
               ]
@@ -893,15 +893,6 @@
           ]
         }
       ]
-    },
-    "_line_block": {
-      "type": "ALIAS",
-      "content": {
-        "type": "SYMBOL",
-        "name": "_value"
-      },
-      "named": true,
-      "value": "block"
     },
     "block": {
       "type": "SEQ",
@@ -1269,29 +1260,33 @@
       ]
     },
     "return": {
-      "type": "SEQ",
-      "members": [
-        {
-          "type": "STRING",
-          "value": "return"
-        },
-        {
-          "type": "FIELD",
-          "name": "value",
-          "content": {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "SYMBOL",
-                "name": "_expression"
-              },
-              {
-                "type": "BLANK"
-              }
-            ]
+      "type": "PREC_RIGHT",
+      "value": 0,
+      "content": {
+        "type": "SEQ",
+        "members": [
+          {
+            "type": "STRING",
+            "value": "return"
+          },
+          {
+            "type": "FIELD",
+            "name": "value",
+            "content": {
+              "type": "CHOICE",
+              "members": [
+                {
+                  "type": "SYMBOL",
+                  "name": "_expression"
+                },
+                {
+                  "type": "BLANK"
+                }
+              ]
+            }
           }
-        }
-      ]
+        ]
+      }
     },
     "when": {
       "type": "CHOICE",
@@ -1358,17 +1353,8 @@
           "type": "FIELD",
           "name": "branch",
           "content": {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "SYMBOL",
-                "name": "block"
-              },
-              {
-                "type": "SYMBOL",
-                "name": "_line_block"
-              }
-            ]
+            "type": "SYMBOL",
+            "name": "_statement"
           }
         }
       ]
@@ -1396,17 +1382,8 @@
           "type": "FIELD",
           "name": "block",
           "content": {
-            "type": "CHOICE",
-            "members": [
-              {
-                "type": "SYMBOL",
-                "name": "block"
-              },
-              {
-                "type": "SYMBOL",
-                "name": "_line_block"
-              }
-            ]
+            "type": "SYMBOL",
+            "name": "_statement"
           }
         }
       ]

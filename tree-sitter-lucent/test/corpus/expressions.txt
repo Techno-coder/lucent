@@ -192,13 +192,15 @@ fn function()
 	if true: true
 	if true:
 		true
+		true
 
 ---
 
 (source (function
 	(identifier) (block
-		(when (branch (truth) (block (truth))))
-		(when (branch (truth) (block (truth)))))))
+		(when (branch (truth) (truth)))
+		(when (branch (truth) 
+			(block (truth) (truth)))))))
 
 =====================================
 When expressions
@@ -214,8 +216,8 @@ fn function()
 (source (function
 	(identifier) (block
 		(let (identifier) (when
-			(branch (truth) (block (integral)))
-			(branch (truth) (block (integral))))))))
+			(branch (truth) (integral))
+			(branch (truth) (integral)))))))
 
 =====================================
 While loops
@@ -223,15 +225,18 @@ While loops
 
 fn function()
 	while true: true
-	while true:
+	while true: break
+	while true: 
 		break
+		return
 
 ---
 
 (source (function
 	(identifier) (block
-		(while (truth) (block (truth)))
-		(while (truth) (block (break))))))
+		(while (truth) (truth))
+		(while (truth) (break))
+		(while (truth) (block (break) (return))))))
 
 =====================================
 Construction

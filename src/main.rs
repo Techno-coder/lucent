@@ -4,6 +4,7 @@
 #![feature(concat_idents)]
 #![feature(bindings_after_at)]
 #![feature(array_value_iter)]
+#![feature(bool_to_option)]
 
 mod error;
 mod utility;

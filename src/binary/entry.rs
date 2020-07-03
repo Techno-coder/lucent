@@ -36,7 +36,7 @@ pub fn entries(context: &Context) -> crate::Result<Vec<Entry>> {
 	items.iter().map(|item| match item {
 		Item::Symbol(symbol @ Symbol::Function(path)) => {
 			if !crate::node::present(context, None, path, None)? { return Ok(()); }
-			let section = crate::generate::x64::lower(context, None, path, None)?;
+			let section = crate::generate::x86::lower(context, None, path, None)?;
 			let address = crate::node::address::start(context, None, symbol, None)?;
 			let load = crate::node::address::load(context, None, symbol, None)?;
 			let size = crate::node::address::size(context, None, symbol, None)?;

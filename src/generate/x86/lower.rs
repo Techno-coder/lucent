@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use iced_x86::{BlockEncoder, BlockEncoderOptions, Instruction, InstructionBlock};
@@ -9,57 +9,25 @@ use crate::node::{FunctionPath, Size, Variable};
 use crate::query::{Key, QueryError};
 use crate::span::Span;
 
-macro_rules! define_note {
-    ($note:ident, $prime:expr, $span:expr) => {
-		let $note = &mut |instruction| $prime.push(instruction, $span);
-    };
-}
+use super::{Mode, Registers};
 
-macro_rules! register {
-    ($size:expr, $index:ident) => {{
-    	use iced_x86::Register::*;
-    	match $size {
-    		Size::Byte => concat_idents!($index, L),
-    		Size::Word => concat_idents!($index, X),
-    		Size::Double => concat_idents!(E, $index, X),
-    		Size::Quad => concat_idents!(R, $index, X),
-    	}
-    }};
-}
-
-macro_rules! code_m {
-    ($size:expr, $identifier:ident $(,$other:ident)*) => {{
-    	use iced_x86::Code::*;
-    	match $size {
-    		Size::Byte => concat_idents!($identifier, m8, $($other,)*),
-    		Size::Word => concat_idents!($identifier, m16, $($other,)*),
-    		Size::Double => concat_idents!($identifier, m32, $($other,)*),
-    		Size::Quad => concat_idents!($identifier, m64, $($other,)*),
-    	}
-    }};
-}
-
-macro_rules! code_rm {
-    ($size:expr, $left:ident, $right:ident) => {{
-    	use iced_x86::Code::*;
-    	match $size {
-    		Size::Byte => concat_idents!($left, r8, $right, m8),
-    		Size::Word => concat_idents!($left, r16, $right, m16),
-    		Size::Double => concat_idents!($left, r32, $right, m32),
-    		Size::Quad => concat_idents!($left, r64, $right, m64),
-    	}
-    }};
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Scene {
-	pub parent: Option<Key>,
+	pub mode: Mode,
+	pub primary: Registers,
+	pub alternate: Registers,
+	pub reserved: HashSet<Registers>,
 	pub variables: HashMap<Variable, isize>,
+	pub parent: Option<Key>,
 	next_offset: isize,
 	next_label: u64,
 }
 
 impl Scene {
+	pub fn mode_primary(&self) -> iced_x86::Register {
+		self.primary[self.mode.size()]
+	}
+
 	pub fn variable(&mut self, variable: Variable, size: usize) -> isize {
 		self.next_offset -= size as isize;
 		self.variables.insert(variable, self.next_offset).unwrap_none();
@@ -104,7 +72,7 @@ pub fn lower(context: &Context, parent: Option<Key>, path: &FunctionPath,
 	let key = Key::Generate(path.clone());
 	context.sections.scope(parent, key.clone(), span.clone(), || {
 		let parent = Some(key.clone());
-		let translation = translate(context, parent, path, span)?;
+		let translation = translate(context, parent, path, Mode::Long, span)?;
 		let block = InstructionBlock::new(&translation.instructions, 0);
 
 		// TODO: remove display code
@@ -141,7 +109,7 @@ pub fn lower(context: &Context, parent: Option<Key>, path: &FunctionPath,
 }
 
 pub fn translate(context: &Context, parent: Option<Key>, path: &FunctionPath,
-				 span: Option<Span>) -> crate::Result<Translation> {
+				 mode: Mode, span: Option<Span>) -> crate::Result<Translation> {
 	let FunctionPath(function, kind) = path;
 	let functions = context.functions.get(&function);
 	let function = functions.as_ref().and_then(|table|
@@ -149,11 +117,25 @@ pub fn translate(context: &Context, parent: Option<Key>, path: &FunctionPath,
 	let types = crate::inference::type_function(context,
 		parent.clone(), path, span)?;
 
-	let mut translation = Translation::default();
-	let scene = &mut Scene { parent, ..Scene::default() };
-	let internal = context.files.read().internal.clone();
+	let reserved = super::reserved(context, function, mode)?;
+	let (primary, alternate) = super::registers(context,
+		&reserved, mode, &function.identifier.span)?;
 
-	super::entry(&mut translation, &internal);
+	let (next_offset, next_label) = (0, 0);
+	let variables = HashMap::new();
+	let scene = &mut Scene {
+		mode,
+		primary,
+		alternate,
+		reserved,
+		variables,
+		parent,
+		next_offset,
+		next_label,
+	};
+
+	let mut translation = Translation::default();
+	super::entry(scene, &mut translation, &function.identifier.span);
 	super::parameters(context, function, scene)?;
 
 	// TODO: remove special main
@@ -171,8 +153,9 @@ pub fn translate(context: &Context, parent: Option<Key>, path: &FunctionPath,
 		return Ok(translation);
 	}
 
+	let root = function.value.root;
 	super::render(context, scene, &mut translation, &types,
-		&function.value, Some(function.value.root), &internal)?;
+		&function.value, Some(root), &function.value[root].span)?;
 
 	let frame_size = -scene.next_offset as i32;
 	if frame_size != 0 {

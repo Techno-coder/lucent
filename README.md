@@ -3,9 +3,9 @@
 A transparent systems language for linking and development on freestanding and embedded environments.
 
 ```
-@@binary flat
+@@binary "flat"
 @load 1024 * 1024
-@architecture x86
+@architecture "x32"
 module Loader
     module Header
         static MAGIC: u32 = 0xe85250d6
@@ -34,7 +34,7 @@ module Loader
             *(0xb8004 as *u32) = 0x4f3a4f52 
             *(0xb8008 as *u32) = 0x4f204f20 
             *(0xb800a as *u32) = code
-            inline x32.halt()       
+            inline x86.halt()       
 
     static STACK: [u8; 64 * 1024]
 ```

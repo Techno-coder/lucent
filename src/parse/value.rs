@@ -65,7 +65,7 @@ pub fn unit(scene: &mut Scene, node: Node) -> crate::Result<ValueIndex> {
 		"path" => return path(scene, node),
 		"group" => return unit(scene, node.named_child(0).unwrap()),
 		"string" => ValueNode::String(super::string(scene.source, node).node),
-		"register" => ValueNode::Register(super::identifier(scene.source, node).node),
+		"register" => ValueNode::Register(super::register(scene.source, node).node),
 		"truth" => ValueNode::Truth(&scene.source.text[node.byte_range()] == "true"),
 		"rune" => super::string(scene.source, node).node
 			.chars().next().map(ValueNode::Rune).unwrap(),

@@ -16,11 +16,13 @@ pub fn cast(context: &Context, scene: &mut Scene, prime: &mut Translation,
 	define_note!(note, prime, span);
 	Ok(match (&types[index], &target.node) {
 		(Type::Signed(size), Type::Signed(target)) |
-		(Type::Signed(size), Type::Unsigned(target))
-		=> sign_extend(size, target).into_iter().for_each(note),
+		(Type::Signed(size), Type::Unsigned(target)) =>
+			sign_extend(scene, *size, *target)
+				.into_iter().for_each(note),
 		(Type::Unsigned(size), Type::Signed(target)) |
-		(Type::Unsigned(size), Type::Unsigned(target))
-		=> zero_extend(size, target).into_iter().for_each(note),
+		(Type::Unsigned(size), Type::Unsigned(target)) =>
+			zero_extend(scene, *size, *target)
+				.into_iter().for_each(note),
 		// TODO: other casts
 		(path, node) => return context.pass(Diagnostic::error()
 			.label(span.label().with_message(path.to_string()))
@@ -29,7 +31,7 @@ pub fn cast(context: &Context, scene: &mut Scene, prime: &mut Translation,
 	})
 }
 
-pub fn zero_extend(size: &Size, target: &Size) -> Option<I> {
+pub fn zero_extend(scene: &Scene, size: Size, target: Size) -> Option<I> {
 	Some(I::with_reg_reg(match (size, target) {
 		(Size::Byte, Size::Word) => Code::Movzx_r16_rm8,
 		(Size::Byte, Size::Double) => Code::Movzx_r32_rm8,
@@ -37,10 +39,10 @@ pub fn zero_extend(size: &Size, target: &Size) -> Option<I> {
 		(Size::Word, Size::Double) => Code::Movzx_r32_rm16,
 		(Size::Word, Size::Quad) => Code::Movzx_r64_rm16,
 		_ => return None,
-	}, register!(target, A), register!(size, A)))
+	}, scene.primary[target], scene.primary[size]))
 }
 
-pub fn sign_extend(size: &Size, target: &Size) -> Option<I> {
+pub fn sign_extend(scene: &Scene, size: Size, target: Size) -> Option<I> {
 	Some(I::with_reg_reg(match (size, target) {
 		(Size::Byte, Size::Word) => Code::Movsx_r16_rm8,
 		(Size::Byte, Size::Double) => Code::Movsx_r32_rm8,
@@ -49,5 +51,5 @@ pub fn sign_extend(size: &Size, target: &Size) -> Option<I> {
 		(Size::Word, Size::Quad) => Code::Movsx_r64_rm16,
 		(Size::Double, Size::Quad) => Code::Movsxd_r64_rm32,
 		_ => return None,
-	}, register!(target, A), register!(size, A)))
+	}, scene.primary[target], scene.primary[size]))
 }

@@ -101,7 +101,7 @@ module.exports = grammar({
                 choice($.parameter, $.register))), ')'),
             field('return', optional($._root_type)),
             choice(field('block', $.block),
-                seq('=', field('block', $._line_block))),
+                seq('=', field('block', $._value))),
         ),
 
         parameter: $ => seq(
@@ -121,7 +121,6 @@ module.exports = grammar({
             ),
         ),
 
-        _line_block: $ => alias($._value, $.block),
         block: $ => enclose($, $._statement),
 
         _root_type: $ => choice(
@@ -178,8 +177,8 @@ module.exports = grammar({
             )), '=', field('value', $._expression),
         ),
 
-        'return': $ => seq('return',
-            field('value', optional($._expression))),
+        'return': $ => prec.right(seq('return',
+            field('value', optional($._expression)))),
 
         when: $ => choice(
             seq('when', ':', $._open, repeat1($.branch), $._close),
@@ -188,12 +187,12 @@ module.exports = grammar({
 
         branch: $ => seq(
             field('condition', $._value),
-            ':', field('branch', choice($.block, $._line_block)),
+            ':', field('branch', $._statement),
         ),
 
         'while': $ => seq('while',
             field('condition', $._value),
-            ':', field('block', choice($.block, $._line_block)),
+            ':', field('block', $._statement),
         ),
 
         _value: $ => prec.right(choice(

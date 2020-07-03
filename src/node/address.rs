@@ -79,7 +79,7 @@ pub fn size(context: &Context, parent: Option<Key>, symbol: &Symbol,
 				super::size(context, Some(key), &path.node, span)
 			}
 			// TODO: use architecture generation
-			Symbol::Function(path) => Ok(crate::generate::x64::lower(context,
+			Symbol::Function(path) => Ok(crate::generate::x86::lower(context,
 				Some(key.clone()), path, span)?.bytes.len()),
 			Symbol::Module(path) => {
 				let module = context.modules.get(path).unwrap();

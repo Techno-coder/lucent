@@ -12,7 +12,7 @@ pub type ValueIndex = usize;
 #[derive(Debug, Default, Clone)]
 pub struct Value {
 	pub root: ValueIndex,
-	values: Vec<S<ValueNode>>,
+	pub values: Vec<S<ValueNode>>,
 }
 
 impl Value {

@@ -39,7 +39,7 @@ fn parameters(scene: &mut Scene, node: Node) -> crate::Result<Vec<S<Parameter>>>
 	let cursor = &mut node.walk();
 	node.children_by_field_name("parameter", cursor)
 		.map(|node| Ok(S::create(match node.kind() {
-			"register" => Parameter::Register(super::identifier(scene.source, node)),
+			"register" => Parameter::Register(super::register(scene.source, node)),
 			"parameter" => {
 				let identifier = super::field_identifier(scene.source, node);
 				match scene.generations.contains_key(&identifier.node) {
@@ -60,7 +60,7 @@ fn return_type(scene: &mut Scene, node: Node, identifier: &S<Identifier>)
 			   -> crate::Result<S<ReturnType>> {
 	Ok(node.child_by_field_name("return")
 		.map(|node| Ok(S::create(match node.kind() {
-			"register" => ReturnType::Register(super::identifier(scene.source, node)),
+			"register" => ReturnType::Register(super::register(scene.source, node)),
 			_ => ReturnType::Type(node_type(scene.context,
 				scene.symbols, scene.source, node)?),
 		}, node.byte_range(), scene.source.file))).transpose()?

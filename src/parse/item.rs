@@ -161,6 +161,11 @@ pub fn identifier(source: &Source, node: Node) -> S<Identifier> {
 	S::create(Identifier(text), node.byte_range(), source.file)
 }
 
+pub fn register(source: &Source, node: Node) -> S<Identifier> {
+	let text = source.text[node.byte_range()][1..].to_string();
+	S::create(Identifier(text), node.byte_range(), source.file)
+}
+
 pub fn string(source: &Source, node: Node) -> S<String> {
 	let text = &source.text[node.start_byte() + 1..node.end_byte() - 1];
 	S::create(text.to_string(), node.byte_range(), source.file)
