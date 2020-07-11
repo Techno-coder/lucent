@@ -81,6 +81,14 @@ pub enum Type {
 }
 
 impl Type {
+	pub fn composite(&self) -> bool {
+		match self {
+			Type::Array(_, _) | Type::Slice(_) |
+			Type::Structure(_) => true,
+			_ => false,
+		}
+	}
+
 	pub fn equal(context: &Context, left: &Self, right: &Self) -> bool {
 		use Type::*;
 		match (left, right) {

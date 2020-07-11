@@ -9,10 +9,13 @@ pub fn compile(context: &Context) -> crate::Result<()> {
 	let path = "binary.bin";
 
 	// TODO: verify no overlaps
-	let mut entries = super::entries(context)?;
-	super::patch(context, &mut entries)?;
-	let segments = super::segments(entries);
+	let mut entries = super::entries(context);
+	super::patch(context, &mut entries);
+	if crate::context::failed(context) {
+		return Err(crate::query::QueryError::Failure);
+	}
 
+	let segments = super::segments(entries);
 	for segment in &segments {
 		match &segment.kind {
 			super::SegmentKind::Text(data) => {

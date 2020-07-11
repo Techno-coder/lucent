@@ -6,7 +6,7 @@ use crate::inference::Types;
 use crate::node::{Binary, Compare, Dual, Size, Type, Value, ValueIndex};
 use crate::span::Span;
 
-use super::{Mode, Scene, Translation};
+use super::{Scene, Translation};
 
 macro_rules! integer_dual {
     ($type:expr, $left:ident, $right: ident) => {
@@ -132,26 +132,8 @@ pub fn binary(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			if let Type::Pointer(path) = &types[left] {
 				let scale = crate::node::size(context, scene
 					.parent.clone(), &path.node, Some(span.clone()))?;
-				let target = scene.mode.size();
-				match &types[right] {
-					Type::Signed(size) => super::sign_extend(scene, *size, target)
-						.into_iter().for_each(|instruction| note(instruction)),
-					Type::Unsigned(size) => super::zero_extend(scene, *size, target)
-						.into_iter().for_each(|instruction| note(instruction)),
-					other => panic!("invalid arithmetic type: {}", other),
-				}
-
-				let alternate = scene.alternate[target];
-				note(I::with_reg_reg_i32(match scene.mode {
-					Mode::Protected => Code::Imul_r32_rm32_imm32,
-					Mode::Long => Code::Imul_r64_rm64_imm32,
-					Mode::Real => Code::Imul_r16_rm16_imm16,
-				}, alternate, alternate, scale as i32));
-				return Ok(note(I::with_reg_reg(match dual {
-					Dual::Add => code_rm!(target, Add_, _r),
-					Dual::Minus => code_rm!(target, Sub_, _r),
-					other => panic!("invalid pointer dual: {:?}", other),
-				}, scene.primary[target], alternate)));
+				return super::scale_index(scene, prime,
+					&types[right], scale, *dual, span);
 			}
 
 			note(I::with_reg_reg(match dual {

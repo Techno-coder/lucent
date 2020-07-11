@@ -30,10 +30,16 @@ pub enum SegmentKind {
 	Reserve(usize),
 }
 
-pub fn entries(context: &Context) -> crate::Result<Vec<Entry>> {
-	let mut symbols = Vec::new();
-	let items = context.items.read();
-	items.iter().map(|item| match item {
+pub fn entries(context: &Context) -> Vec<Entry> {
+	let mut entries = Vec::new();
+	context.items.read().iter().for_each(|item|
+		std::mem::drop(entry(context, &mut entries, item)));
+	entries
+}
+
+fn entry(context: &Context, entries: &mut Vec<Entry>,
+		 item: &Item) -> crate::Result<()> {
+	match item {
 		Item::Symbol(symbol @ Symbol::Function(path)) => {
 			if !crate::node::present(context, None, path, None)? { return Ok(()); }
 			let section = crate::generate::x86::lower(context, None, path, None)?;
@@ -41,13 +47,12 @@ pub fn entries(context: &Context) -> crate::Result<Vec<Entry>> {
 			let load = crate::node::address::load(context, None, symbol, None)?;
 			let size = crate::node::address::size(context, None, symbol, None)?;
 			let entity = Entity::Function(section.as_ref().clone());
-			Ok(symbols.push(Entry { load, address, size, entity }))
+			Ok(entries.push(Entry { load, address, size, entity }))
 		}
 		Item::Symbol(Symbol::Variable(_)) => unimplemented!(),
 		Item::Symbol(Symbol::Module(_)) => Ok(()),
 		Item::ModuleEnd => Ok(()),
-	}).filter(Result::is_err).last().unwrap_or(Ok(()))?;
-	Ok(symbols)
+	}
 }
 
 pub fn segments(mut entries: Vec<Entry>) -> Vec<Segment> {

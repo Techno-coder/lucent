@@ -83,6 +83,12 @@ impl Default for Files {
 	}
 }
 
+pub fn failed(context: &Context) -> bool {
+	context.diagnostics.lock().iter()
+		.any(|Diagnostic(diagnostic)| diagnostic.severity ==
+			codespan_reporting::diagnostic::Severity::Error)
+}
+
 pub fn display(context: &Context) -> std::io::Result<()> {
 	use codespan_reporting::term;
 	let files = &context.files.read().files;

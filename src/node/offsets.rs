@@ -29,6 +29,19 @@ pub fn size(context: &Context, parent: Option<Key>, path: &Type,
 	})
 }
 
+pub fn offset(context: &Context, parent: Option<Key>, path: &Type,
+			  field: &Identifier, span: Option<Span>) -> crate::Result<usize> {
+	Ok(match path {
+		Type::Structure(path) => offsets(context,
+			parent, path, span)?.fields[field],
+		Type::Slice(_) => {
+			// TODO: dependent on pointer size
+			unimplemented!()
+		}
+		other => panic!("offset on type: {}", other),
+	})
+}
+
 // TODO: consider C and packed representation
 pub fn offsets(context: &Context, parent: Option<Key>, path: &Path,
 			   span: Option<Span>) -> crate::Result<Arc<Offsets>> {

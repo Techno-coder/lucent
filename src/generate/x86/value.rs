@@ -5,7 +5,7 @@ use iced_x86::MemoryOperand as M;
 use crate::context::Context;
 use crate::error::Diagnostic;
 use crate::inference::Types;
-use crate::node::{Binary, FunctionPath, Size, Type, Value, ValueIndex, ValueNode};
+use crate::node::*;
 
 use super::{Mode, Scene, Translation};
 
@@ -34,16 +34,14 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 
 			define_note!(note, prime, span);
 			note(I::with_reg(super::code_push(stack), scene.primary[stack]));
-			super::target(context, scene, prime, types, value, target)?;
+			let target = super::target(context, scene, prime, types, value, target)?;
 
 			define_note!(note, prime, span);
-			let alternate = scene.alternate[size];
-			note(I::with_reg(super::code_pop(stack), scene.alternate[stack]));
-
-			let size = crate::node::size(context, scene
+			let node_size = crate::node::size(context, scene
 				.parent.clone(), &types[index], Some(span.clone()))?;
-			let memory = M::with_base_index(scene.mode.base(), scene.mode_primary());
-			super::set(prime, &types[index], size, memory, alternate, span);
+			note(I::with_reg(super::code_pop(stack), scene.alternate[stack]));
+			super::set(prime, &types[index], node_size, target,
+				scene.alternate[size], span);
 		}
 		ValueNode::While(condition, index) => {
 			let entry = *prime.pending_label.get_or_insert_with(|| scene.label());
@@ -142,34 +140,56 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 
 			define_note!(note, prime, span);
 			note(I::with_reg(super::code_push(stack), scene.primary[stack]));
-			super::target(context, scene, prime, types, value, target)?;
+			let target = super::target(context, scene, prime, types, value, target)?;
 
 			define_note!(note, prime, span);
-			let alternate = scene.alternate[size];
-			note(I::with_reg(super::code_pop(stack), scene.alternate[stack]));
-
-			let size = crate::node::size(context, scene
+			let node_size = crate::node::size(context, scene
 				.parent.clone(), &types[index], Some(span.clone()))?;
-			let memory = M::with_base_index(scene.mode.base(), scene.mode_primary());
-			super::set(prime, &types[index], size, memory, alternate, span);
+			note(I::with_reg(super::code_pop(stack), scene.alternate[stack]));
+			super::set(prime, &types[index], node_size, target,
+				scene.alternate[size], span);
 		}
 		ValueNode::Binary(binary, left, right) => super::binary(context,
 			scene, prime, types, value, binary, left, right, span)?,
-		ValueNode::Unary(_, _) => unimplemented!(),
+		ValueNode::Unary(unary, index) => {
+			if let Unary::Reference = unary {
+				let instruction = I::with_reg_mem(super::load(scene.mode),
+					scene.mode_primary(), super::target(context,
+						scene, prime, types, value, index)?);
+				return Ok(prime.push(instruction, span));
+			}
+
+			let size = super::size(context, scene, &types[index], span)?;
+			self::value(context, scene, prime, types, value, index)?;
+			let primary = scene.primary[size];
+			define_note!(note, prime, span);
+			match unary {
+				Unary::Reference => unreachable!(),
+				Unary::Not => note(match types[index] {
+					Type::Truth => I::with_reg_i32(Code::Xor_rm8_imm8,
+						scene.primary[Size::Byte], 1),
+					_ => I::with_reg(code_m!(size, Not_r), primary),
+				}),
+				Unary::Negate => note(I::with_reg(code_m!(size, Neg_r), primary)),
+				Unary::Dereference => if types[index].composite() {
+					let node_size = crate::node::size(context, scene
+						.parent.clone(), &types[index], Some(span.clone()))?;
+					let offset = scene.reserve(node_size) as i32;
+					let memory = M::with_base_displ(scene.mode.base(), offset);
+					super::set(prime, &types[index], node_size,
+						memory, primary, span);
+				},
+			}
+		}
 		ValueNode::Variable(variable) => {
 			let offset = scene.variables[variable] as i32;
 			let memory = M::with_base_displ(scene.mode.base(), offset);
 			let path = &types.variables[variable];
 
 			let size = super::size(context, scene, path, span)?;
-			note(I::with_reg_mem(match path {
-				Type::Slice(_) | Type::Array(_, _) |
-				Type::Structure(_) => match scene.mode {
-					Mode::Protected => Code::Lea_r32_m,
-					Mode::Long => Code::Lea_r64_m,
-					Mode::Real => Code::Lea_r16_m,
-				},
-				_ => code_rm!(size, Mov_, _r),
+			note(I::with_reg_mem(match path.composite() {
+				false => code_rm!(size, Mov_, _r),
+				true => super::load(scene.mode),
 			}, scene.primary[size], memory));
 		}
 		ValueNode::Path(_) => unimplemented!(),

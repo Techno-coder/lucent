@@ -29,8 +29,13 @@ impl Scene {
 	}
 
 	pub fn variable(&mut self, variable: Variable, size: usize) -> isize {
+		let next_offset = self.reserve(size);
+		self.variables.insert(variable, next_offset).unwrap_none();
+		next_offset
+	}
+
+	pub fn reserve(&mut self, size: usize) -> isize {
 		self.next_offset -= size as isize;
-		self.variables.insert(variable, self.next_offset).unwrap_none();
 		self.next_offset
 	}
 

@@ -1,2 +1,6 @@
 tree-sitter-lucent/src/parser.c linguist-generated
+tree-sitter-lucent/src/binding.cc linguist-generated
+tree-sitter-lucent/src/grammar.json linguist-generated
+tree-sitter-lucent/src/node-types.json linguist-generated
+tree-sitter-lucent/src/tree_sitter/parser.h linguist-generated
 

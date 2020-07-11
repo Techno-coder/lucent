@@ -154,8 +154,21 @@ pub fn value(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariable
 				*scene.values.entry(*index).insert(variable).get()
 			}
 			Unary::Not => {
-				truth_type(context, scene, place, value, node)?;
-				scene.ascribe(index, S::new(Type::Truth, span.clone()))
+				let variable = self::value(context, scene, place, value, node)?;
+				let terminal = &scene.find(variable);
+				match scene.terminals.get(terminal) {
+					Some(Terminal::Integral(_)) |
+					Some(Terminal::Type(S { node: Type::Signed(_), .. })) |
+					Some(Terminal::Type(S { node: Type::Unsigned(_), .. })) =>
+						*scene.values.entry(*index).insert(variable).get(),
+					Some(Terminal::Type(S { node: Type::Truth, .. })) =>
+						scene.ascribe(index, S::new(Type::Truth, span.clone())),
+					Some(node) => return context.pass(Diagnostic::error()
+						.label(span.label().with_message(node.to_string()))
+						.message("operation undefined for type")),
+					None => return context.pass(Diagnostic::error().label(span.label())
+						.message("unresolved type").note("add a type annotation")),
+				}
 			}
 		},
 		ValueNode::Variable(variable) => *scene.values
