@@ -1041,6 +1041,15 @@
           "value": "break"
         },
         {
+          "type": "ALIAS",
+          "content": {
+            "type": "STRING",
+            "value": "continue"
+          },
+          "named": true,
+          "value": "continue"
+        },
+        {
           "type": "SYMBOL",
           "name": "_expression"
         },

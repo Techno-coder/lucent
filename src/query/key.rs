@@ -14,6 +14,7 @@ pub enum Key {
 	LoadAddress(Symbol),
 	VirtualAddress(Symbol),
 	Generate(FunctionPath),
+	Analyze(FunctionPath),
 }
 
 impl Key {
@@ -28,6 +29,7 @@ impl Key {
 			Key::LoadAddress(_) => "in deriving load address",
 			Key::VirtualAddress(_) => "in deriving virtual address",
 			Key::Generate(_) => "in generating function",
+			Key::Analyze(_) => "in analyzing function",
 		}
 	}
 }

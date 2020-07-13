@@ -6,10 +6,13 @@ use iced_x86::{BlockEncoder, BlockEncoderOptions, Instruction, InstructionBlock}
 use crate::context::Context;
 use crate::generate::{Relative, Section};
 use crate::node::{FunctionPath, Size, Variable};
-use crate::query::{Key, QueryError};
+use crate::query::Key;
 use crate::span::Span;
 
 use super::{Mode, Registers};
+
+type Entry = u64;
+type Exit = u64;
 
 #[derive(Debug)]
 pub struct Scene {
@@ -18,6 +21,7 @@ pub struct Scene {
 	pub alternate: Registers,
 	pub reserved: HashSet<Registers>,
 	pub variables: HashMap<Variable, isize>,
+	pub loops: Vec<(Entry, Exit)>,
 	pub parent: Option<Key>,
 	next_offset: isize,
 	next_label: u64,
@@ -119,25 +123,21 @@ pub fn lower(context: &Context, parent: Option<Key>, path: &FunctionPath,
 
 pub fn translate(context: &Context, parent: Option<Key>, path: &FunctionPath,
 				 mode: Mode, span: Option<Span>) -> crate::Result<Translation> {
-	let FunctionPath(function, kind) = path;
-	let functions = context.functions.get(&function);
-	let function = functions.as_ref().and_then(|table|
-		table.get(*kind)).ok_or(QueryError::Failure)?;
-	let types = crate::inference::type_function(context,
-		parent.clone(), path, span)?;
-
+	let function = &crate::node::function(context, parent.clone(), path, span.clone())?;
+	let types = crate::inference::type_function(context, parent.clone(), path, span)?;
 	let reserved = super::reserved(context, function, mode)?;
 	let (primary, alternate) = super::registers(context,
 		&reserved, mode, &function.identifier.span)?;
 
 	let (next_offset, next_label) = (0, 0);
-	let variables = HashMap::new();
+	let (variables, loops) = (HashMap::new(), Vec::new());
 	let scene = &mut Scene {
 		mode,
 		primary,
 		alternate,
 		reserved,
 		variables,
+		loops,
 		parent,
 		next_offset,
 		next_label,

@@ -98,7 +98,7 @@ fn align(other: &Symbol, symbol: &Symbol, address: Address) -> Address {
 		_ => {
 			// TODO: derive alignment from annotation
 			let alignment = 4 * 1024;
-			crate::utility::ceiling(address, alignment)
+			crate::other::ceiling(address, alignment)
 		}
 	}
 }

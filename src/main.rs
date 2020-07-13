@@ -7,10 +7,11 @@
 #![feature(bool_to_option)]
 
 mod error;
-mod utility;
+mod other;
 mod context;
 mod inference;
 mod generate;
+mod analysis;
 mod binary;
 mod arena;
 mod query;

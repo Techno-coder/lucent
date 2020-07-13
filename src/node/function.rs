@@ -63,6 +63,7 @@ pub enum ValueNode {
 	Integral(i128),
 	Truth(bool),
 	Rune(char),
+	Continue,
 	Break,
 }
 

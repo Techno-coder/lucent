@@ -144,6 +144,7 @@ module.exports = grammar({
 
         _statement: $ => choice(
             alias('break', $.break),
+            alias('continue', $.continue),
             $._expression,
             $.compound,
             $.return,

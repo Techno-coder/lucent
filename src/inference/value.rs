@@ -201,6 +201,7 @@ pub fn value(context: &Context, scene: &mut Scene, place: Option<&S<TypeVariable
 		ValueNode::Integral(node) => integral(context, scene, index, node, span.clone())?,
 		ValueNode::Truth(_) => scene.ascribe(index, S::new(Type::Truth, span.clone())),
 		ValueNode::Rune(_) => scene.ascribe(index, S::new(Type::Rune, span.clone())),
+		ValueNode::Continue => scene.ascribe(index, S::new(Type::Void, span.clone())),
 		ValueNode::Break => scene.ascribe(index, S::new(Type::Void, span.clone())),
 	})
 }

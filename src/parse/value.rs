@@ -62,6 +62,7 @@ pub fn value(context: &Context, symbols: &Symbols,
 pub fn unit(scene: &mut Scene, node: Node) -> crate::Result<ValueIndex> {
 	let value = match node.kind() {
 		"break" => ValueNode::Break,
+		"continue" => ValueNode::Continue,
 		"path" => return path(scene, node),
 		"group" => return unit(scene, node.named_child(0).unwrap()),
 		"string" => ValueNode::String(super::string(scene.source, node).node),

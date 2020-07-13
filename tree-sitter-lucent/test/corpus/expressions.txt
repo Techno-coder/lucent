@@ -225,7 +225,7 @@ While loops
 
 fn function()
 	while true: true
-	while true: break
+	while true: continue
 	while true: 
 		break
 		return
@@ -235,7 +235,7 @@ fn function()
 (source (function
 	(identifier) (block
 		(while (truth) (truth))
-		(while (truth) (break))
+		(while (truth) (continue))
 		(while (truth) (block (break) (return))))))
 
 =====================================

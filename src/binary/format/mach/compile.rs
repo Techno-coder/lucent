@@ -4,7 +4,7 @@ use goblin::mach::{constants, header, load_command};
 use scroll::IOwrite;
 
 use crate::binary::{Segment, SegmentKind};
-use crate::utility::ceiling;
+use crate::other::ceiling;
 
 use super::{BinarySegment, LoadCommands, UnixThreadCommand};
 

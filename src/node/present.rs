@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use crate::context::Context;
-use crate::query::{Key, QueryError};
+use crate::query::Key;
 use crate::span::Span;
 
 use super::{FunctionPath, ValueNode};
@@ -27,11 +27,7 @@ pub fn present(context: &Context, parent: Option<Key>, path: &FunctionPath,
 
 fn function(context: &Context, present: &mut HashSet<FunctionPath>,
 			path: &FunctionPath) -> crate::Result<()> {
-	let FunctionPath(function, kind) = path;
-	let functions = context.functions.get(function);
-	let function = functions.as_ref().and_then(|table|
-		table.get(*kind)).ok_or(QueryError::Failure)?;
-
+	let function = crate::node::function(context, None, path, None)?;
 	let types = crate::inference::type_function(context, None, path, None)?;
 	types.functions.iter().try_for_each(|(index, kind)| {
 		let path = match &function.value[*index].node {

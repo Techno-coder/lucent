@@ -609,6 +609,10 @@
           "named": true
         },
         {
+          "type": "continue",
+          "named": true
+        },
+        {
           "type": "create",
           "named": true
         },
@@ -713,6 +717,10 @@
           },
           {
             "type": "compound",
+            "named": true
+          },
+          {
+            "type": "continue",
             "named": true
           },
           {
@@ -3086,6 +3094,10 @@
             "named": true
           },
           {
+            "type": "continue",
+            "named": true
+          },
+          {
             "type": "create",
             "named": true
           },
@@ -3357,6 +3369,10 @@
   },
   {
     "type": "break",
+    "named": true
+  },
+  {
+    "type": "continue",
     "named": true
   },
   {

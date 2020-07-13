@@ -53,12 +53,14 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			self::value(context, scene, prime, types, value, condition)?;
 
 			let exit = scene.label();
+			scene.loops.push((entry, exit));
 			define_note!(note, prime, span);
 			let register = scene.primary[Size::Byte];
 			note(I::with_reg_reg(Code::Test_rm8_r8, register, register));
 			note(I::with_branch(relative!(scene.mode, Je), exit));
 			self::value(context, scene, prime, types, value, index)?;
 
+			scene.loops.pop();
 			define_note!(note, prime, span);
 			note(I::with_branch(relative!(scene.mode, Jmp), entry));
 			prime.set_pending_label(exit, span);
@@ -235,6 +237,9 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			_ => note(I::with_reg_u32(Code::Mov_r32_imm32,
 				scene.primary[Size::Double], *rune as u32)),
 		}
-		ValueNode::Break => unimplemented!(),
+		ValueNode::Break => note(I::with_branch(relative!(scene.mode, Jmp),
+			scene.loops.last().map(|(_, label)| *label).unwrap())),
+		ValueNode::Continue => note(I::with_branch(relative!(scene.mode, Jmp),
+			scene.loops.last().map(|(label, _)| *label).unwrap())),
 	})
 }

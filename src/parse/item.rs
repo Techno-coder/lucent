@@ -55,7 +55,7 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 			let functions = &mut context.functions.entry(path.clone()).or_default();
 			let symbol = Symbol::Function(FunctionPath(path, functions.len()));
 			context.items.write().push(Item::Symbol(symbol));
-			functions.push(function);
+			functions.push(Arc::new(function));
 		}
 		"static" => {
 			let identifier = field_identifier(source, node);

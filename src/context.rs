@@ -22,7 +22,7 @@ pub struct Context {
 	pub modules: DashMap<Path, Module>,
 	pub statics: DashMap<Path, Static>,
 	pub structures: DashMap<Path, Structure>,
-	pub functions: DashMap<Path, Vec<Function>>,
+	pub functions: DashMap<Path, Vec<Arc<Function>>>,
 	pub positions: RwLock<HashMap<Symbol, Position>>,
 	pub present: RwLock<HashSet<FunctionPath>>,
 	pub type_contexts: Table<Types>,
