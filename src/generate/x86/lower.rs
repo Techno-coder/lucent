@@ -24,6 +24,10 @@ pub struct Scene {
 }
 
 impl Scene {
+	pub fn parameters_offset(&self) -> usize {
+		self.mode.size().bytes() * 2
+	}
+
 	pub fn mode_primary(&self) -> iced_x86::Register {
 		self.primary[self.mode.size()]
 	}

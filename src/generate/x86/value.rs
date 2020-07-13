@@ -6,6 +6,7 @@ use crate::context::Context;
 use crate::error::Diagnostic;
 use crate::inference::Types;
 use crate::node::*;
+use crate::query::QueryError;
 
 use super::{Mode, Scene, Translation};
 
@@ -16,16 +17,20 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 	Ok(match &value[*index].node {
 		ValueNode::Block(block) => block.iter().try_for_each(|index|
 			self::value(context, scene, prime, types, value, index))?,
-		ValueNode::Let(_, _, None) => unimplemented!(),
-		ValueNode::Let(variable, _, Some(index)) => {
-			self::value(context, scene, prime, types, value, index)?;
+		ValueNode::Let(variable, _, index) => {
 			let size = crate::node::size(context, scene.parent.clone(),
 				&types.variables[&variable.node], Some(span.clone()))?;
 			let offset = scene.variable(variable.node.clone(), size);
-			let memory = M::with_base_displ(scene.mode.base(), offset as i32);
-			let register = super::size(context, scene, &types[index], span)?;
-			super::set(prime, &types[index], size, memory,
-				scene.primary[register], span);
+
+			if let Some(index) = index {
+				self::value(context, scene, prime, types, value, index)?;
+				let memory = M::with_base_displ(scene.mode.base(), offset as i32);
+				let register = super::size(context, scene, &types[index], span)?;
+				super::set(scene, prime, &types[index], size,
+					memory, scene.primary[register], span);
+			} else {
+				super::zero(scene, prime, offset, size, span);
+			}
 		}
 		ValueNode::Set(target, index) => {
 			self::value(context, scene, prime, types, value, index)?;
@@ -40,8 +45,8 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			let node_size = crate::node::size(context, scene
 				.parent.clone(), &types[index], Some(span.clone()))?;
 			note(I::with_reg(super::code_pop(stack), scene.alternate[stack]));
-			super::set(prime, &types[index], node_size, target,
-				scene.alternate[size], span);
+			super::set(scene, prime, &types[index], node_size,
+				target, scene.alternate[size], span);
 		}
 		ValueNode::While(condition, index) => {
 			let entry = *prime.pending_label.get_or_insert_with(|| scene.label());
@@ -94,42 +99,55 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			scene, prime, types, value, *index, span)?,
 		ValueNode::Compile(_) => unimplemented!(),
 		ValueNode::Inline(_) => unimplemented!(),
-		ValueNode::Call(path, arguments) => {
-			// TODO: provide argument for structure returns
-			let size = arguments.iter().rev().try_fold(0, |size, argument| {
-				// TODO: copy structures onto stack
-				self::value(context, scene, prime, types, value, argument)?;
-				let stack = super::size(context, scene,
-					&types[argument], span).map(super::stack)?;
-
-				define_note!(note, prime, span);
-				note(I::with_reg(super::code_push(stack), scene.primary[stack]));
-				Ok(size + crate::node::size(context, scene.parent.clone(),
-					&types[argument], Some(span.clone()))?)
-			})? as i32;
-
-			let call_index = prime.instructions.len();
-			let (path, kind) = (path.node.clone(), types.functions[&index]);
-			prime.calls.push((call_index, FunctionPath(path, kind)));
+		ValueNode::Call(path, arguments) => super::call(context, scene,
+			prime, types, value, index, path, &arguments, span)?,
+		ValueNode::Field(node, field) => {
+			self::value(context, scene, prime, types, value, node)?;
+			let offset = crate::node::offset(context, scene.parent.clone(),
+				&types[node], &field.node, Some(span.clone()))? as i32;
 
 			define_note!(note, prime, span);
-			note(I::with_branch(relative!(scene.mode, Call), 0));
-			note(I::with_reg_i32(match scene.mode {
-				Mode::Protected => Code::Add_rm32_imm32,
-				Mode::Long => Code::Add_rm64_imm32,
-				Mode::Real => Code::Add_rm16_imm16,
-			}, scene.mode.stack(), size));
-			// TODO: set structure return as pointer
-
-			if !matches!(types[index], Type::Void) {
-				// TODO: calling convention dependent
+			if types[index].composite() {
+				note(I::with_reg_i32(match scene.mode {
+					Mode::Protected => Code::Add_rm32_imm32,
+					Mode::Long => Code::Add_rm64_imm32,
+					Mode::Real => Code::Add_rm16_imm16,
+				}, scene.mode_primary(), offset));
+			} else {
 				let size = super::size(context, scene, &types[index], span)?;
-				let (register, target) = (register!(size, A), scene.primary[size]);
-				super::transfer(prime, register, target, size, span);
+				let memory = M::with_base_displ(scene.mode_primary(), offset);
+				note(I::with_reg_mem(code_rm!(size, Mov_, _r),
+					scene.primary[size], memory));
 			}
 		}
-		ValueNode::Field(_, _) => unimplemented!(),
-		ValueNode::Create(_, _) => unimplemented!(),
+		ValueNode::Create(path, fields) => {
+			let offsets = crate::node::offsets(context, scene
+				.parent.clone(), &path.node, Some(span.clone()))?;
+			let structure = context.structures.get(&path.node)
+				.ok_or(QueryError::Failure)?;
+			let base = scene.reserve(offsets.size);
+
+			for (identifier, offset) in &offsets.fields {
+				let path = &structure.fields[identifier].node;
+				let node_size = crate::node::size(context,
+					scene.parent.clone(), &path, Some(span.clone()))?;
+				let offset = base + *offset as isize;
+
+				if let Some((index, _)) = fields.get(identifier) {
+					let size = super::size(context, scene, path, span)?;
+					self::value(context, scene, prime, types, value, index)?;
+					let memory = M::with_base_displ(scene.mode.base(), offset as i32);
+					super::set(scene, prime, path, node_size, memory,
+						scene.primary[size], span);
+				} else {
+					super::zero(scene, prime, offset, node_size, span);
+				}
+			}
+
+			let memory = M::with_base_displ(scene.mode.base(), base as i32);
+			prime.push(I::with_reg_mem(super::load(scene.mode),
+				scene.mode_primary(), memory), span);
+		}
 		ValueNode::Slice(_, _, _) => unimplemented!(),
 		ValueNode::Index(_, _) => unimplemented!(),
 		ValueNode::Compound(dual, target, index) => {
@@ -146,8 +164,8 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 			let node_size = crate::node::size(context, scene
 				.parent.clone(), &types[index], Some(span.clone()))?;
 			note(I::with_reg(super::code_pop(stack), scene.alternate[stack]));
-			super::set(prime, &types[index], node_size, target,
-				scene.alternate[size], span);
+			super::set(scene, prime, &types[index], node_size,
+				target, scene.alternate[size], span);
 		}
 		ValueNode::Binary(binary, left, right) => super::binary(context,
 			scene, prime, types, value, binary, left, right, span)?,
@@ -176,8 +194,10 @@ pub fn value(context: &Context, scene: &mut Scene, prime: &mut Translation,
 						.parent.clone(), &types[index], Some(span.clone()))?;
 					let offset = scene.reserve(node_size) as i32;
 					let memory = M::with_base_displ(scene.mode.base(), offset);
-					super::set(prime, &types[index], node_size,
-						memory, primary, span);
+					super::set(scene, prime, &types[index],
+						node_size, memory, primary, span);
+					prime.push(I::with_reg_mem(super::load(scene.mode),
+						scene.primary[size], memory), span);
 				},
 			}
 		}

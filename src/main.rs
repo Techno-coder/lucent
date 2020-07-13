@@ -22,7 +22,7 @@ type Result<T> = std::result::Result<T, query::QueryError>;
 
 fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
 	let context = &context::Context::default();
-	let path = std::path::Path::new("examples/fibonacci.lc");
+	let path = std::path::Path::new("examples/structures.lc");
 	query::emit(context, execute(context, path));
 	Ok(context::display(context)?)
 }

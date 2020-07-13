@@ -1,4 +1,5 @@
 pub use binary::*;
+pub use call::*;
 pub use cast::*;
 pub use function::*;
 pub use lower::*;
@@ -15,4 +16,5 @@ mod binary;
 mod target;
 mod register;
 mod function;
+mod call;
 mod cast;

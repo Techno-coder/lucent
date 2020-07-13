@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
 
+use indexmap::IndexMap;
+
 use crate::node::Variable;
 use crate::span::S;
 
@@ -68,7 +70,7 @@ pub type Annotations = HashMap<Identifier, S<super::Value>>;
 #[derive(Debug)]
 pub struct Structure {
 	pub annotations: Annotations,
-	pub fields: HashMap<Identifier, S<super::Type>>,
+	pub fields: IndexMap<Identifier, S<super::Type>>,
 }
 
 #[derive(Debug)]

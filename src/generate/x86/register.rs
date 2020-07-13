@@ -39,6 +39,14 @@ impl Mode {
 			Mode::Real => Register::SP,
 		}
 	}
+
+	pub fn destination(&self) -> Register {
+		match self {
+			Mode::Protected => Register::EDI,
+			Mode::Long => Register::RDI,
+			Mode::Real => Register::DI,
+		}
+	}
 }
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]

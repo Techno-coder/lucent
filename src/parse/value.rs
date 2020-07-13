@@ -138,6 +138,14 @@ pub fn unit(scene: &mut Scene, node: Node) -> crate::Result<ValueIndex> {
 			let cursor = &mut node.walk();
 			let fields = node.children_by_field_name("field", cursor);
 			let path = super::path(scene.source, node.child_by_field_name("path").unwrap());
+			let path = match scene.symbols.resolve(scene.context, &path.node, &path.span) {
+				Some((structure, SymbolKind::Structure)) => S::new(structure, path.span),
+				Some(_) => return scene.context.pass(Diagnostic::error().label(path.span.label())
+					.message(format!("symbol at path: {}, is not a data structure", path))),
+				None => return scene.context.pass(Diagnostic::error().label(path.span.label())
+					.message(format!("no data structure at path: {}", path))),
+			};
+
 			ValueNode::Create(path, fields.map(|field| Ok(match field.kind() {
 				"identifier" => {
 					let identifier = super::identifier(scene.source, field);

@@ -89,6 +89,7 @@ pub fn code_sign_extend(size: Size) -> Code {
 	}
 }
 
+/// Moves a value between two registers if they are different.
 pub fn transfer(prime: &mut Translation, register: Register,
 				target: Register, size: Size, span: &Span) {
 	if register != target {
@@ -98,6 +99,9 @@ pub fn transfer(prime: &mut Translation, register: Register,
 	}
 }
 
+/// Reserves a register for use. If the register is already
+/// reserved then it is saved and restored off the stack.
+/// Temporarily marks the register as reserved.
 pub fn reserve<F>(scene: &mut Scene, prime: &mut Translation,
 				  target: Register, function: F, size: Size, span: &Span)
 	where F: FnOnce(&mut Scene, &mut Translation) {
@@ -114,6 +118,9 @@ pub fn reserve<F>(scene: &mut Scene, prime: &mut Translation,
 	if !free { note(I::with_reg(code_pop(size), target)); }
 }
 
+/// Tries to use a register if it is not reserved. If it is, the register
+/// is reserved and saved and the existing value is transferred to the default
+/// register. The register used is provided to the closure.
 pub fn convey<F>(scene: &mut Scene, prime: &mut Translation, register: Register,
 				 default: Register, function: F, size: Size, span: &Span)
 	where F: FnOnce(&Scene, &mut Translation, Register) {
@@ -127,6 +134,8 @@ pub fn convey<F>(scene: &mut Scene, prime: &mut Translation, register: Register,
 	}
 }
 
+/// Returns the size of the machine code representation for a type.
+/// Composite types take the same size as a pointer.
 pub fn size(context: &Context, scene: &Scene, path: &Type,
 			span: &Span) -> crate::Result<Size> {
 	let size = match path {
@@ -149,6 +158,8 @@ pub fn size(context: &Context, scene: &Scene, path: &Type,
 	}
 }
 
+/// Promotes byte sizes to words. Bytes cannot be
+/// directly used in stack instructions.
 pub fn stack(size: Size) -> Size {
 	match size {
 		Size::Byte => Size::Word,

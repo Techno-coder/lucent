@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use codespan::FileId;
+use indexmap::IndexMap;
 use tree_sitter::{Language, Node, Parser, Query};
 
 use crate::context::Context;
@@ -89,9 +90,9 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 		}
 		"data" => {
 			let cursor = &mut node.walk();
-			let mut fields = HashMap::new();
+			let mut fields = IndexMap::new();
 			for node in node.children_by_field_name("field", cursor) {
-				let identifier = identifier(source, node);
+				let identifier = field_identifier(source, node);
 				let node_type = super::node_type(context, symbols,
 					source, node.child_by_field_name("type").unwrap())?;
 				match fields.get(&identifier.node) {
@@ -109,7 +110,7 @@ pub fn item(context: &Context, symbols: &mut Symbols, path: Path,
 			let symbol = Symbol::Module(path.clone());
 			context.items.write().push(Item::Symbol(symbol));
 
-			let identifier = identifier(source, node);
+			let identifier = field_identifier(source, node);
 			let annotations = annotations(context, symbols, source, node);
 			let module = Module { annotations, identifier, first: None, last: None };
 			context.modules.insert(path.clone(), module);

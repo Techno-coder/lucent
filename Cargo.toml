@@ -10,6 +10,7 @@ parking_lot = "^0.10"
 codespan-reporting = "^0.9"
 codespan = "^0.9"
 dashmap = "^3.0"
+indexmap = "^1.4"
 goblin = "^0.2"
 
 [dependencies.scroll]
