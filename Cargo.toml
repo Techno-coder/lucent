@@ -5,26 +5,19 @@ authors = ["Technocoder <8334328+Techno-coder@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
-tree-sitter = "^0.16"
-parking_lot = "^0.10"
+tree-sitter = "^0.17"
+parking_lot = "^0.11"
 codespan-reporting = "^0.9"
 codespan = "^0.9"
 dashmap = "^3.0"
-indexmap = "^1.4"
-goblin = "^0.2"
-
-[dependencies.scroll]
-version = "^0.10"
-features = ["derive"]
 
 [dependencies.iced-x86]
 version = "^1.2"
 default-features = false
 features = [
-	"std",
-	"nasm",
-	"block_encoder",
-	"db",
+    "std",
+    "block_encoder",
+    "db",
 ]
 
 [build-dependencies]

@@ -1,72 +1,173 @@
+use std::collections::HashSet;
 use std::sync::Arc;
+use std::thread::ThreadId;
 
 use dashmap::DashMap;
+use dashmap::mapref::entry;
 
-use crate::span::Span;
-
-use super::Key;
+use super::*;
 
 #[derive(Debug)]
 pub enum QueryError {
-	Cycle(Vec<(Key, Option<Span>)>),
+	Cycle(Vec<(ESpan, Key)>),
 	Failure,
 }
 
+/// A concurrent table that contains entries for
+/// query results. Guaranteed to be deadlock free.
 #[derive(Debug)]
-pub struct Table<V> {
-	table: DashMap<Key, (Entry<V>, Vec<Key>)>,
+pub struct Table<K: QueryKey> {
+	table: DashMap<K, Entry<K>>,
 }
 
-impl<V> Table<V> {
-	pub fn scope<F>(&self, parent: Option<Key>, key: Key, span: Option<Span>,
-					function: F) -> Result<Arc<V>, QueryError>
-		where F: FnOnce() -> Result<V, QueryError> {
-		if !self.table.contains_key(&key) {
-			self.table.insert(key.clone(), (Entry::Pending, Vec::new()));
-			self.table.insert(key.clone(), (match function() {
-				Ok(value) => Entry::Value(Arc::new(value)),
-				Err(QueryError::Failure) => Entry::Failure,
-				Err(QueryError::Cycle(mut keys)) => {
-					keys.push((key.clone(), span));
-					self.table.insert(key, (Entry::Failure, Vec::new()));
-					return Err(QueryError::Cycle(keys));
+impl<K: QueryKey> Table<K> {
+	pub fn scope<P>(&self, scope: QScope, key: K,
+					provide: P) -> Result<Arc<K::Value>, QueryError>
+		where P: FnOnce(MScope) -> Result<Arc<K::Value>, QueryError> {
+		if scope.cancelled() { return Err(QueryError::Failure); }
+		scope.dependencies.push(key.clone().into());
+
+		// Retrieve query entry. Effectively
+		// takes lock on entire table.
+		match self.table.entry(key.clone()) {
+			entry::Entry::Occupied(mut lock) => {
+				let entry = lock.get_mut();
+				entry.dependents.extend(scope.parent.clone());
+				match &mut entry.kind {
+					EntryKind::Value(value) => Ok(value.clone()),
+					EntryKind::Failure => Err(QueryError::Failure),
+					EntryKind::Pending(set) => {
+						let kind = std::thread::current().id();
+						if set.contains(&kind) {
+							// Thread has already initiated pending query.
+							let trace = (scope.span.clone(), key.into());
+							Err(QueryError::Cycle(vec![trace]))
+						} else {
+							// Different thread initiating pending query.
+							// To make progress we duplicate the computation but
+							// we do not competitively store the result. This
+							// means a query can be executed more than once
+							// for a particular key.
+							set.insert(kind);
+							std::mem::drop(lock);
+
+							let mut scoped = Scope::new(scope.ctx,
+								scope.handle, Some(key.clone().into()));
+							match provide(&mut scoped) {
+								Ok(value) => Ok(value),
+								Err(QueryError::Failure) =>
+									Err(QueryError::Failure),
+								Err(QueryError::Cycle(mut keys)) => {
+									keys.push((scope.span.clone(), key.into()));
+									Err(QueryError::Cycle(keys))
+								}
+							}
+						}
+					}
 				}
-			}, Vec::new()));
-		}
+			}
+			entry::Entry::Vacant(lock) => {
+				let mut entry = lock.insert(Entry::pending());
+				entry.dependents.extend(scope.parent.clone());
+				std::mem::drop(entry);
 
-		let mut entry = self.table.get_mut(&key).unwrap();
-		let (entry, dependents) = entry.value_mut();
-		dependents.extend(parent);
-		match entry {
-			Entry::Value(value) => Ok(value.clone()),
-			Entry::Failure => Err(QueryError::Failure),
-			Entry::Pending => Err(QueryError::Cycle(vec![(key, span)])),
+				let mut scoped = Scope::new(scope.ctx,
+					scope.handle, Some(key.clone().into()));
+				let mut result = provide(&mut scoped);
+				let cancelled = || match scope.cancelled() {
+					false => panic!("table invalidation before cancellation"),
+					true => Err(QueryError::Failure),
+				};
+
+				match self.table.entry(key.clone()) {
+					// Entry has been invalidated.
+					entry::Entry::Vacant(_) => cancelled(),
+					entry::Entry::Occupied(mut lock) => {
+						let entry = lock.get_mut();
+						if let EntryKind::Pending(set) = &entry.kind {
+							if !set.contains(&std::thread::current().id()) {
+								// Entry originated from different thread. This
+								// means another query has started after this
+								// entry was invalidated.
+								cancelled()
+							} else if scope.cancelled() {
+								// Entry has not been mutated since
+								// this query has started.
+								let _ = lock.remove();
+								Err(QueryError::Failure)
+							} else {
+								match &mut result {
+									Ok(value) => entry.kind =
+										EntryKind::Value(value.clone()),
+									Err(QueryError::Failure) =>
+										entry.kind = EntryKind::Failure,
+									Err(QueryError::Cycle(keys)) => {
+										entry.kind = EntryKind::Failure;
+										keys.push((scope.span.clone(), key.into()));
+									}
+								}
+
+								entry.errors = scoped.errors;
+								entry.dependencies = scoped.dependencies;
+								result
+							}
+						} else {
+							// Entry is not pending. This means another query
+							// has completed after this entry was invalidated.
+							cancelled()
+						}
+					}
+				}
+			}
 		}
 	}
 
-	pub fn ephemeral<F>(&self, parent: Option<Key>, key: Key, span: Option<Span>,
-						function: F) -> Result<Arc<V>, QueryError>
-		where F: FnOnce() -> Result<V, QueryError> {
-		let result = self.scope(parent, key.clone(), span, function);
-		self.invalidate(&key);
-		result
-	}
-
-	pub fn invalidate(&self, key: &Key) {
-		self.table.remove(key).unwrap_or_else(||
-			panic!("key: {:?}, absent from query table", key));
+	/// Invalidates and removes the entry associated
+	/// with a key. Returns a list of dependent keys
+	/// for further invalidation.
+	///
+	/// All pending queries into this table must be
+	/// cancelled before calling this function.
+	pub fn invalidate(&self, key: &K) -> Vec<Key> {
+		self.table.remove(key)
+			.map(|(_, entry)| entry.dependents)
+			.unwrap_or_default()
 	}
 }
 
-impl<V> Default for Table<V> {
+impl<K: QueryKey> Default for Table<K> {
 	fn default() -> Self {
 		Table { table: DashMap::new() }
 	}
 }
 
 #[derive(Debug)]
-enum Entry<V> {
-	Pending,
-	Failure,
+pub struct Entry<K: QueryKey> {
+	kind: EntryKind<K::Value>,
+	pub dependencies: Vec<Key>,
+	pub dependents: Vec<Key>,
+	pub errors: Vec<E>,
+}
+
+impl<K: QueryKey> Entry<K> {
+	/// Creates a new pending entry. Initializes
+	/// the thread access set with the current thread.
+	pub fn pending() -> Self {
+		let mut kind = HashSet::new();
+		kind.insert(std::thread::current().id());
+
+		Entry {
+			kind: EntryKind::Pending(kind),
+			dependencies: vec![],
+			dependents: vec![],
+			errors: vec![],
+		}
+	}
+}
+
+#[derive(Debug)]
+enum EntryKind<V> {
 	Value(Arc<V>),
+	Pending(HashSet<ThreadId>),
+	Failure,
 }

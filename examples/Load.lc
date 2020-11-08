@@ -1,0 +1,7 @@
+@@binary "elf"
+@load 1024 * 1024
+@architecture "x64"
+module Load
+	load "library.a" as Library
+	load Library.function as fn function()
+	static A: u64 = 0

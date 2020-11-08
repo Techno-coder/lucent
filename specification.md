@@ -109,6 +109,16 @@ let pointer: *i32 = &variable + 1
 ```
 The offset is dependent on the size of the pointed type.
 
+### Dereferencing
+```
+expression!
+```
+Pointers are dereferenced by appending an exclamation. This makes
+chained dereferencing more ergonomic:
+```
+a!.b!.c!
+```
+
 ## Conversions
 ```
 value as type
@@ -160,7 +170,7 @@ if condition: statement.0
 ## When expressions
 When expressions are similar to if expressions. Multiple branches are collated under a single expression:
 ```
-when:
+when
 	condition.0:
 		statement.0
 		...
@@ -210,7 +220,7 @@ Marking a function as `root` will prevent the function from being removed from t
 root identifier(...) = expression
 ```
 
-### Register parameters
+### [Removed] Register parameters
 ```
 fn identifier($register.0, $register.1, ...) type.return = ...
 ```
@@ -274,12 +284,12 @@ data identifier
 ```
 Structures are constructed by initialization:
 ```
-identifier ~ field.0 = value.0, field.1 = value.1, ...
+new identifier field.0: value.0, field.1: value.1, ...
 ```
 If there are variables in scope with the same name as the field then the assignment can be omitted:
 ```
 let field.0 = value.0
-identifier ~ field.0, ...
+new identifier field.0, ...
 ```
 Fields omitted from the construction are default initialized to zero.
 
@@ -345,52 +355,52 @@ item
 
 ## Libraries
 ```
-use "path" as identifier
+load "path" as identifier
 ```
 Libraries can be imported as a namespaced name. Symbols from the library must be explicitly imported: 
 ```
-use identifier.function as fn function(type.0, ...)
+load identifier.function as fn function(type.0, ...)
 ```
 Addresses from the library can be directly imported:
 ```
-use identifier.address as fn function(type.0, ...)
+load identifier.address as fn function(type.0, ...)
 ```
 Calling conventions can be specified on the function signature:
 ```
-use identifier.function as convention fn(type.0, ...)
+load identifier.function as convention fn(type.0, ...)
 ```
 Symbols can also be imported as static variables:
 ```
-use identifier.symbol as variable: type
+load identifier.symbol as variable: type
 ```
 ### [Removed] Implicit symbol names
 Named symbols can have the import name omitted:
 ```
-use identifier.function as fn(type.0, ...)
+load identifier.function as fn(type.0, ...)
 ```
 
 ### Address annotations
 ```
 @load address.0
 @virtual address.1
-use "path" as identifier
+load "path" as identifier
 ```
 Libraries may be relocated with address annotations but if the library type does not support relocation then an admission will be issued.
 
 ### [Future] C interoperability
 ```
-use "path" with "path.h"
+load "path" with "path.h"
 ```
 Symbols can be read automatically from a C header file. They can also be namespaced:
 ```
-use "path" with "path.h" as identifier
+load "path" with "path.h" as identifier
 ```
 
 ## File management
 ```
 use "./path.lc"
 ```
-Other source files can be included at the place of usage. Source inclusions can also be namespaced:
+Other source files can be included as modules at the place of usage. The module takes on the name of the included file without the extension. The name can also be manually defined:
 ```
 use "./path.lc" as identifier
 ```
@@ -401,7 +411,7 @@ use path
 use path as identifier
 use path.*
 ```
-Namespace imports are effective after the position of import and only within the enclosing scope. Wildcards are allowed only as the last element in the path.
+Namespace imports are effective after the position of import and only within the enclosing scope and file. Wildcards are allowed only as the last element in the path.
 
 ## Guarantees
 ### Function pruning

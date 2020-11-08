@@ -9,7 +9,7 @@ module Main
 		b: u8
 
 	root fn main() u8
-		pair(Pair ~ a = 1, b = 2).b
+		pair(new Pair a: 1, b: 2).b
 
 	fn pair(pair: Pair) Pair
-		Pair ~ a = pair.a, b = pair.b
+		new Pair a: pair.a, b: pair.b

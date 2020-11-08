@@ -1,6 +1,7 @@
 "module" @keyword
 "when" @keyword
 "fn" @keyword
+"new" @keyword
 "data" @keyword
 "static" @keyword
 "inline" @keyword

@@ -32,17 +32,17 @@ fn function()
 
 ---
 
-(source item: (function
-	identifier: (identifier)
+(source (function
+	name: (identifier)
 	block: (block
-		(let identifier: (identifier)
+		(let name: (identifier)
 			type: (path (identifier))
 			value: (path (identifier)))
-		(let identifier: (identifier)
+		(let name: (identifier)
 			value: (path (identifier)))
-		(let identifier: (identifier)
+		(let name: (identifier)
 			type: (path (identifier)))
-		(let identifier: (identifier)))))
+		(let name: (identifier)))))
 
 =====================================
 Binary expressions
@@ -60,7 +60,7 @@ fn function()
 	(identifier) (block
 		(binary (integral) (integral))
 		(binary (integral) (binary (integral) (integral)))
-		(binary (integral) (group (binary (integral) (integral))))
+		(binary (integral) (binary (integral) (integral)))
 		(binary (integral) (binary (binary
 			(integral) (integral)) (integral))))))
 
@@ -69,7 +69,7 @@ Unary expressions
 =====================================
 
 fn function()
-	-1 + *&identifier
+	-1 + &identifier
 	!true
 
 ---
@@ -77,7 +77,7 @@ fn function()
 (source (function
 	(identifier) (block
 		(binary (unary (integral))
-			(unary (unary (path (identifier)))))
+			(unary (path (identifier))))
 		(unary (truth)))))
 
 =====================================
@@ -107,10 +107,10 @@ fn function()
 
 ---
 
-(source item: (function
-	identifier: (identifier) block: (block
+(source (function
+	name: (identifier) block: (block
 		(call function: (path (identifier)))
-		(let identifier: (identifier)
+		(let name: (identifier)
 			value: (call function: (path (identifier))))
 		(call function: (path (identifier))
 			argument: (integral) argument: (truth)
@@ -171,7 +171,7 @@ Pointers
 
 fn function()
 	let variable: **u8 = 0 as *u8 as **u8
-	**variable
+	&identifier!.field
 
 ---
 
@@ -182,7 +182,8 @@ fn function()
 			(cast (cast (integral)
 				(pointer (path (identifier))))
 				(pointer (pointer (path (identifier))))))
-		(unary (unary (path (identifier)))))))
+		(unary (access (dereference
+			(path (identifier))) (identifier))))))
 
 =====================================
 If expressions
@@ -207,7 +208,7 @@ When expressions
 =====================================
 
 fn function()
-	let variable = when:
+	let variable = when
 		false: 0
 		true: 1
 
@@ -243,15 +244,47 @@ Construction
 =====================================
 
 fn function()
-	Structure ~ field = true, field
+	new Structure field: true, field
 
 ---
 
 (source (function
 	(identifier) (block
-		(create (path (identifier))
+		(new (path (identifier))
 			(field (identifier) (truth))
 			(identifier)))))
+
+=====================================
+Slice construction
+=====================================
+
+fn function()
+	new [u8;] address: 0, size: 0
+
+---
+
+(source (function
+	(identifier) (block
+		(new (slice_type (path (identifier)))
+			(field (identifier) (integral))
+			(field (identifier) (integral))))))
+
+=====================================
+Nested construction
+=====================================
+
+fn function()
+	new A a: (new A), b: new B
+
+---
+
+(source (function
+	(identifier) (block
+		(new (path (identifier))
+			(field (identifier)
+				(new (path (identifier))))
+			(field (identifier)
+				(new (path (identifier))))))))
 
 =====================================
 Fields
@@ -267,8 +300,8 @@ fn function()
 (source (function
 	(identifier) (block
 		(path (identifier) (identifier))
-		(access (group (path (identifier))) (identifier))
-		(access (access (group (path (identifier)))
+		(access (path (identifier)) (identifier))
+		(access (access (path (identifier))
 			(identifier)) (identifier)))))
 
 =====================================
@@ -277,7 +310,7 @@ Assignment
 
 fn function()
 	identifier = true
-	*identifier() =
+	identifier()! =
 		true
 
 ---
@@ -285,7 +318,7 @@ fn function()
 (source (function
 	(identifier) (block
 		(set (path (identifier)) (truth))
-		(set (unary (call (path (identifier))))
+		(set (dereference (call (path (identifier))))
 			(block (truth))))))
 
 =====================================

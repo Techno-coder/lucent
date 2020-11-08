@@ -21,13 +21,13 @@ fn function(first: type, second: type) truth
 ---
 
 (source
-	item: (function
-		identifier: (identifier)
+	(function
+		name: (identifier)
 		parameter: (parameter
-			identifier: (identifier)
+			name: (identifier)
 			type: (path (identifier)))
 		parameter: (parameter
-			identifier: (identifier)
+			name: (identifier)
 			type: (path (identifier)))
 		return: (path (identifier))
 		block: (block (truth))))
@@ -42,10 +42,10 @@ fn function(parameter: type)
 ---
 
 (source
-	item: (function
-		identifier: (identifier)
+	(function
+		name: (identifier)
 		parameter: (parameter
-			identifier: (identifier)
+			name: (identifier)
 			type: (path (identifier)))
 		block: (block (truth))))
 
@@ -58,8 +58,8 @@ fn function() truth = true
 ---
 
 (source
-	item: (function
-		identifier: (identifier)
+	(function
+		name: (identifier)
 		return: (path (identifier))
 		block: (truth)))
 
@@ -72,9 +72,9 @@ cdecl fn function() truth = true
 ---
 
 (source
-	item: (function
+	(function
 		convention: (identifier)
-		identifier: (identifier)
+		name: (identifier)
 		return: (path (identifier))
 		block: (truth)))
 
@@ -87,9 +87,9 @@ root fn function() truth = true
 ---
 
 (source
-	item: (function
+	(function
 		root: (root)
-		identifier: (identifier)
+		name: (identifier)
 		return: (path (identifier))
 		block: (truth)))
 
@@ -104,15 +104,15 @@ static identifier = true
 ---
 
 (source
-	item: (static
-		identifier: (identifier)
+	(static
+		name: (identifier)
 		type: (path (identifier))
 		value: (truth))
-	item: (static
-		identifier: (identifier)
+	(static
+		name: (identifier)
 		type: (path (identifier)))
-	item: (static
-		identifier: (identifier)
+	(static
+		name: (identifier)
 		value: (truth)))
 
 =====================================
@@ -169,12 +169,33 @@ module Module
 Imports
 =====================================
 
+load "path" as identifier
+load "path" with "path"
+load "path" with "path" as identifier
+load identifier.function as fn function(type) type
+load identifier.0x0000 as convention fn function()
+load identifier.symbol as variable: type
+
+---
+
+(source
+	(load (string) (identifier))
+	(load (string) (string))
+	(load (string) (string) (identifier))
+	(load (identifier) (identifier)
+		(signature (identifier) (path (identifier))
+			(path (identifier))))
+	(load (identifier) (integral)
+		(signature (identifier) (identifier)))
+	(load (identifier) (identifier)
+		(static (identifier) (path (identifier)))))
+
+=====================================
+Uses
+=====================================
+
 use "path"
-use "path" with "path"
 use "path" as identifier
-use identifier.function as fn function(type) type
-use identifier.0x0000 as convention fn function()
-use identifier.symbol as variable: type
 use identifier.*
 use identifier
 
@@ -182,14 +203,6 @@ use identifier
 
 (source
 	(use (string))
-	(use (string) (string))
 	(use (string) (identifier))
-	(use (path (identifier) (identifier))
-		(signature (identifier) (path (identifier))
-			(path (identifier))))
-	(use (path (identifier) (integral))
-		(signature (identifier) (identifier)))
-	(use (path (identifier) (identifier))
-		(static (identifier) (path (identifier))))
-	(use (path (identifier) (wild)))
-	(use (path (identifier))))
+	(use (identifier) (wild))
+	(use (identifier)))
