@@ -2,8 +2,9 @@ use crate::query::S;
 
 use super::*;
 
-pub type SIndex = VIndex<SNode>;
 pub type SValue = Value<SNode>;
+pub type SIndex = VIndex<SNode>;
+pub type SReceiver = Receiver<SIndex>;
 
 #[derive(Debug)]
 pub struct SFunction {
@@ -28,7 +29,7 @@ pub enum SNode {
 	Integral(STarget, i128),
 	Let(STarget, LBinary, STarget, STarget),
 	LetIntegral(STarget, LBinary, STarget, i128),
-	Call(Option<STarget>, Convention, S<Path>, Vec<SPlace>),
+	Call(Option<STarget>, SReceiver, Vec<SPlace>),
 	If(STarget, SIndex, Option<SIndex>),
 	Return(SPlace),
 	Loop(SIndex),

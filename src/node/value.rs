@@ -17,6 +17,13 @@ pub struct Value<T> {
 }
 
 impl<T> Value<T> {
+	pub fn new<F>(function: F) -> Self where F: FnOnce(&mut Self) -> VIndex<T> {
+		let root = VIndex(0, Default::default());
+		let mut value = Self { root, nodes: Vec::new() };
+		value.root = function(&mut value);
+		value
+	}
+
 	pub fn insert(&mut self, node: S<T>) -> VIndex<T> {
 		self.nodes.push(node);
 		let index = self.nodes.len() - 1;

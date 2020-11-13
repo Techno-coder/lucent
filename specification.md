@@ -123,6 +123,11 @@ a!.b!.c!
 ```
 value as type
 ```
+You can omit the type if the target type can be implicitly derived:
+```
+let variable: type = value as _
+```
+
 ### Integral 
 * Conversions between integral types of the same width will not change the bit representation
 * Reductions in width will take the lower (least significant) bits
@@ -132,13 +137,13 @@ value as type
 * `0` is defined as `false`
 * Any other number is defined as `true`
 
-### [Future] Pointer to pointer
+### Pointer to pointer
 ```
 pointer as *type
 ```
 Pointers can be casted to any other pointer including function pointers:
 ```
-pointer as convention fn(type) type
+pointer as convention fn(argument: type) type
 ```
 
 ## Static variables
@@ -291,7 +296,6 @@ If there are variables in scope with the same name as the field then the assignm
 let field.0 = value.0
 new identifier field.0, ...
 ```
-Fields omitted from the construction are default initialized to zero.
 
 ### [Future] Structure variants
 Structures can also have variants:
@@ -346,7 +350,7 @@ item
 ```
 The `virtual` annotation defines what other instructions should treat the address as. For example, call instructions will invoke the virtual address instead of the actual (load) address.
 
-### Admissions
+### [Future] Admissions
 Admissions are compiler warnings or notes. They can be suppressed by annotating the offending item:
 ```
 @admit identifier
@@ -359,15 +363,15 @@ load "path" as identifier
 ```
 Libraries can be imported as a namespaced name. Symbols from the library must be explicitly imported: 
 ```
-load identifier.function as fn function(type.0, ...)
+load identifier.function as fn function(argument.0: type.0, ...)
 ```
 Addresses from the library can be directly imported:
 ```
-load identifier.address as fn function(type.0, ...)
+load identifier.address as fn function(argument.0: type.0, ...)
 ```
 Calling conventions can be specified on the function signature:
 ```
-load identifier.function as convention fn(type.0, ...)
+load identifier.function as convention fn(argument.0: type.0, ...)
 ```
 Symbols can also be imported as static variables:
 ```
@@ -389,12 +393,9 @@ Libraries may be relocated with address annotations but if the library type does
 
 ### [Future] C interoperability
 ```
-load "path" with "path.h"
+load "path" as identifier with "path.h"
 ```
-Symbols can be read automatically from a C header file. They can also be namespaced:
-```
-load "path" with "path.h" as identifier
-```
+Symbols can be read automatically from a C header file. 
 
 ## File management
 ```

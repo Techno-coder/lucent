@@ -2,14 +2,16 @@ use crate::query::S;
 
 use super::*;
 
-pub type LIndex = VIndex<LNode>;
 pub type LValue = Value<LNode>;
+pub type LIndex = VIndex<LNode>;
+pub type LReceiver = Receiver<LIndex>;
 
 /// A lower variant of `HNode` that is
 /// amenable to code generation. Used in lowering
 /// to `SNode`s or stack based code generators
 /// such as `wasm`.
 ///
+/// Type information is not preserved.
 /// Control flow statements such as `continue`
 /// and `break` must be valid at their position.
 // TODO: add Compile and Inline
@@ -23,7 +25,7 @@ pub enum LNode {
 	When(Vec<(LIndex, LIndex)>),
 	Cast(LIndex, S<Width>),
 	Return(LIndex),
-	Call(S<FPath>, Vec<LIndex>),
+	Call(LReceiver, Vec<LIndex>),
 	Offset(LIndex, S<usize>),
 	Binary(LBinary, Width, LIndex, LIndex),
 	Unary(Unary, Width, LIndex),

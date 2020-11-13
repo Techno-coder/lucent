@@ -1,20 +1,24 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
+
+use indexmap::IndexMap;
 
 use crate::FilePath;
-use crate::query::S;
+use crate::query::{ISpan, S};
 
 use super::*;
 
-pub type HAnnotations = HashMap<S<Identifier>, HValue>;
+pub type HAnnotations = HashMap<Identifier, (ISpan, HValue)>;
+pub type HVariables = IndexMap<Identifier, (ISpan, S<HType>)>;
+pub type HFields = HashMap<Identifier, (ISpan, HIndex)>;
 pub type HIndex = VIndex<HNode>;
 pub type HValue = Value<HNode>;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct HModule {
 	pub annotations: HAnnotations,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct HStatic {
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
@@ -22,42 +26,45 @@ pub struct HStatic {
 	pub value: Option<HValue>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
+pub struct HData {
+	pub name: S<Identifier>,
+	pub fields: HVariables,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct HFunction {
 	pub annotations: HAnnotations,
-	pub convention: Option<Identifier>,
 	pub name: S<Identifier>,
-	pub parameters: Vec<HParameter>,
-	pub return_type: S<HType>,
+	pub signature: HSignature,
 	pub value: HValue,
 }
 
-#[derive(Debug)]
-pub struct HParameter {
-	pub identifier: S<Identifier>,
-	pub kind: S<HType>,
+#[derive(Debug, PartialEq)]
+pub struct HSignature {
+	pub convention: Option<S<Identifier>>,
+	pub parameters: HVariables,
+	pub return_type: S<HType>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct HLibrary {
 	pub annotations: HAnnotations,
 	pub path: FilePath,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct HLoadFunction {
-	pub library: Path,
+	pub library: S<Path>,
 	pub reference: LoadReference,
 	pub annotations: HAnnotations,
-	pub convention: Option<Identifier>,
 	pub name: S<Identifier>,
-	pub parameters: Vec<S<HType>>,
-	pub return_type: S<HType>,
+	pub signature: HSignature,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct HLoadStatic {
-	pub library: Path,
+	pub library: S<Path>,
 	pub reference: LoadReference,
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
@@ -65,22 +72,24 @@ pub struct HLoadStatic {
 }
 
 /// A high level abstract syntax tree node
-/// that closely resembles source code.
-#[derive(Debug, Hash, Eq, PartialEq)]
+/// that closely resembles source code. All
+/// paths and variables are resolved and exist.
+#[derive(Debug, PartialEq)]
 pub enum HNode {
 	Block(Vec<HIndex>),
 	Let(S<Variable>, Option<S<HType>>, Option<HIndex>),
 	Set(HIndex, HIndex),
 	While(HIndex, HIndex),
 	When(Vec<(HIndex, HIndex)>),
-	Cast(HIndex, S<HType>),
+	Cast(HIndex, Option<S<HType>>),
 	Return(Option<HIndex>),
 	Compile(HValue),
 	Inline(HValue),
 	Call(S<Path>, Vec<HIndex>),
+	Method(HIndex, Vec<HIndex>),
 	Field(HIndex, S<Identifier>),
-	New(S<Path>, BTreeMap<S<Identifier>, HIndex>),
-	SliceNew(S<Path>, BTreeMap<S<Identifier>, HIndex>),
+	New(S<Path>, HFields),
+	SliceNew(S<HType>, HFields),
 	Slice(HIndex, Option<HIndex>, Option<HIndex>),
 	Index(HIndex, HIndex),
 	Compound(HDual, HIndex, HIndex),
@@ -96,22 +105,39 @@ pub enum HNode {
 	Rune(char),
 	Continue,
 	Break,
+	Error,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub enum HBinary {
 	Dual(HDual),
+	And,
+	Or,
+	NotEqual,
+	Equal,
 	Less,
 	Greater,
 	LessEqual,
 	GreaterEqual,
-	NotEqual,
-	Equal,
-	And,
-	Or,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+impl HBinary {
+	pub fn parse(string: &str) -> Option<Self> {
+		Some(match string {
+			"&&" => Self::And,
+			"||" => Self::Or,
+			"!=" => Self::NotEqual,
+			"==" => Self::Equal,
+			"<" => Self::Less,
+			">" => Self::Greater,
+			"<=" => Self::LessEqual,
+			">=" => Self::GreaterEqual,
+			_ => Self::Dual(HDual::parse(string)?),
+		})
+	}
+}
+
+#[derive(Debug, PartialEq)]
 pub enum HDual {
 	Add,
 	Minus,
@@ -125,7 +151,25 @@ pub enum HDual {
 	ShiftRight,
 }
 
-#[derive(Debug, Hash, Eq, PartialEq)]
+impl HDual {
+	pub fn parse(string: &str) -> Option<Self> {
+		Some(match string {
+			"+" => Self::Add,
+			"-" => Self::Minus,
+			"*" => Self::Multiply,
+			"/" => Self::Divide,
+			"%" => Self::Modulo,
+			"|" => Self::BinaryOr,
+			"&" => Self::BinaryAnd,
+			"^" => Self::ExclusiveOr,
+			"<<" => Self::ShiftLeft,
+			">>" => Self::ShiftRight,
+			_ => return None,
+		})
+	}
+}
+
+#[derive(Debug, PartialEq)]
 pub enum HType {
 	Void,
 	Rune,
@@ -134,6 +178,7 @@ pub enum HType {
 	Structure(Path),
 	Integral(Sign, Width),
 	Pointer(Box<S<HType>>),
+	Function(Box<HSignature>),
 	Array(Box<S<HType>>, HValue),
 	Slice(Box<S<HType>>),
 }

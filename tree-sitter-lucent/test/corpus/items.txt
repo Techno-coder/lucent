@@ -23,14 +23,14 @@ fn function(first: type, second: type) truth
 (source
 	(function
 		name: (identifier)
-		parameter: (parameter
+		(variable
 			name: (identifier)
 			type: (path (identifier)))
-		parameter: (parameter
+		(variable
 			name: (identifier)
 			type: (path (identifier)))
 		return: (path (identifier))
-		block: (block (truth))))
+		value: (block (truth))))
 
 =====================================
 Void functions
@@ -44,10 +44,10 @@ fn function(parameter: type)
 (source
 	(function
 		name: (identifier)
-		parameter: (parameter
+		(variable
 			name: (identifier)
 			type: (path (identifier)))
-		block: (block (truth))))
+		value: (block (truth))))
 
 =====================================
 Expression functions
@@ -61,7 +61,7 @@ fn function() truth = true
 	(function
 		name: (identifier)
 		return: (path (identifier))
-		block: (truth)))
+		value: (truth)))
 
 =====================================
 Calling conventions
@@ -76,7 +76,7 @@ cdecl fn function() truth = true
 		convention: (identifier)
 		name: (identifier)
 		return: (path (identifier))
-		block: (truth)))
+		value: (truth)))
 
 =====================================
 Root functions
@@ -91,7 +91,7 @@ root fn function() truth = true
 		root: (root)
 		name: (identifier)
 		return: (path (identifier))
-		block: (truth)))
+		value: (truth)))
 
 =====================================
 Static variables
@@ -145,8 +145,8 @@ data Structure
 ---
 
 (source (data (identifier)
-	(field (identifier) (path (identifier)))
-	(field (identifier) (path (identifier)))))
+	(variable (identifier) (path (identifier)))
+	(variable (identifier) (path (identifier)))))
 
 =====================================
 Annotations
@@ -170,24 +170,23 @@ Imports
 =====================================
 
 load "path" as identifier
-load "path" with "path"
-load "path" with "path" as identifier
-load identifier.function as fn function(type) type
+load "path" as identifier with "path"
+load identifier.function as fn function(_: type) type
 load identifier.0x0000 as convention fn function()
-load identifier.symbol as variable: type
+load module.identifier.symbol as variable: type
 
 ---
 
 (source
 	(load (string) (identifier))
-	(load (string) (string))
-	(load (string) (string) (identifier))
-	(load (identifier) (identifier)
-		(signature (identifier) (path (identifier))
+	(load (string) (identifier) (string))
+	(load (path (identifier)) (identifier)
+		(signature (identifier)
+			(variable (identifier) (path (identifier)))
 			(path (identifier))))
-	(load (identifier) (integral)
+	(load (path (identifier)) (integral)
 		(signature (identifier) (identifier)))
-	(load (identifier) (identifier)
+	(load (path (identifier) (identifier)) (identifier)
 		(static (identifier) (path (identifier)))))
 
 =====================================
@@ -204,5 +203,5 @@ use identifier
 (source
 	(use (string))
 	(use (string) (identifier))
-	(use (identifier) (wild))
+	(use (identifier) (wildcard))
 	(use (identifier)))

@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use super::{Context, E, ESpan, Key, QueryError};
+use super::{Context, E, ESpan, Key};
 
 pub type MScope<'a, 'b> = &'b mut Scope<'a>;
 pub type QScope<'a, 'b, 'c> = &'c mut QueryScope<'a, 'b>;
@@ -41,7 +41,7 @@ impl<'a> Scope<'a> {
 	}
 
 	/// Converts this scope to a `ParameterScope` by annotating
-	/// it with a source location `Span`.
+	/// it with a source location span.
 	pub fn span(&mut self, span: impl Into<ESpan>) -> QueryScope<'a, '_> {
 		QueryScope { scope: self, span: span.into() }
 	}
@@ -51,18 +51,7 @@ impl<'a> Scope<'a> {
 		self.errors.push(error);
 	}
 
-	/// Adds an error to this query. Returns
-	/// `QueryError::Failure` for convenience.
-	pub fn error(&mut self, error: E) -> QueryError {
-		self.emit(error);
-		QueryError::Failure
-	}
-
-	/// Adds an error to this query. Returns
-	/// `crate::Result` for convenience.
-	pub fn result<T>(&mut self, error: E) -> crate::Result<T> {
-		Err(self.error(error))
-	}
+	pub fn cancel(&self) {}
 
 	pub(super) fn cancelled(&self) -> bool {
 		self.handle.map(ScopeHandle::cancelled).unwrap_or(false)

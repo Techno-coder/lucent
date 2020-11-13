@@ -75,6 +75,11 @@ bool FUNCTION(scan)(void* object, TSLexer* lexer, const bool* valid) {
                 lexer->advance(lexer, true), ++length;
             } else if (lexer->lookahead == ' ') {
                 lexer->advance(lexer, true);
+            } else if (lexer->lookahead == '/') {
+                lexer->advance(lexer, false);
+                if (lexer->lookahead == '/')
+                    while (lexer->lookahead && lexer->lookahead != '\n')
+                        lexer->advance(lexer, true);
             } else if (!new_line) {
                 return false;
             } else break;

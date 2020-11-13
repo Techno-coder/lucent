@@ -21,10 +21,13 @@ pub struct Table<K: QueryKey> {
 }
 
 impl<K: QueryKey> Table<K> {
-	pub fn scope<P>(&self, scope: QScope, key: K,
+	pub fn scope<P>(&self, scope: QScope, key: impl Into<K>,
 					provide: P) -> Result<Arc<K::Value>, QueryError>
 		where P: FnOnce(MScope) -> Result<Arc<K::Value>, QueryError> {
 		if scope.cancelled() { return Err(QueryError::Failure); }
+		let key: K = key.into();
+
+		// Add this query as a dependency of the parent query.
 		scope.dependencies.push(key.clone().into());
 
 		// Retrieve query entry. Effectively
@@ -122,6 +125,13 @@ impl<K: QueryKey> Table<K> {
 		}
 	}
 
+	pub fn errors(&self, key: &K) -> (Vec<E>, Vec<Key>) {
+		self.table.get(key)
+			.filter(|entry| !matches!(entry.kind, EntryKind::Pending(_)))
+			.map(|entry| (entry.errors.clone(), entry.dependencies.clone()))
+			.unwrap_or_else(|| (vec![], vec![]))
+	}
+
 	/// Invalidates and removes the entry associated
 	/// with a key. Returns a list of dependent keys
 	/// for further invalidation.
@@ -144,8 +154,8 @@ impl<K: QueryKey> Default for Table<K> {
 #[derive(Debug)]
 pub struct Entry<K: QueryKey> {
 	kind: EntryKind<K::Value>,
-	pub dependencies: Vec<Key>,
 	pub dependents: Vec<Key>,
+	pub dependencies: Vec<Key>,
 	pub errors: Vec<E>,
 }
 
@@ -158,8 +168,8 @@ impl<K: QueryKey> Entry<K> {
 
 		Entry {
 			kind: EntryKind::Pending(kind),
-			dependencies: vec![],
 			dependents: vec![],
+			dependencies: vec![],
 			errors: vec![],
 		}
 	}

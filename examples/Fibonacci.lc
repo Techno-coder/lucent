@@ -1,5 +1,5 @@
 @@binary "mach-o"
-@@entry Intrinsic.start(Main.main)
+// @@entry Intrinsic.start(Main.main)
 
 @architecture "x64"
 @load 1024 * 1024

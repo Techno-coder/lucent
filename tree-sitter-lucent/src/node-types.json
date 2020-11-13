@@ -3,7 +3,7 @@
     "type": "access",
     "named": true,
     "fields": {
-      "field": {
+      "name": {
         "multiple": false,
         "required": true,
         "types": [
@@ -17,14 +17,6 @@
         "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "access",
             "named": true
@@ -51,6 +43,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -120,14 +116,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -153,6 +141,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -204,6 +196,93 @@
     }
   },
   {
+    "type": "arguments",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "access",
+          "named": true
+        },
+        {
+          "type": "array",
+          "named": true
+        },
+        {
+          "type": "binary",
+          "named": true
+        },
+        {
+          "type": "block",
+          "named": true
+        },
+        {
+          "type": "call",
+          "named": true
+        },
+        {
+          "type": "cast",
+          "named": true
+        },
+        {
+          "type": "dereference",
+          "named": true
+        },
+        {
+          "type": "group",
+          "named": true
+        },
+        {
+          "type": "index",
+          "named": true
+        },
+        {
+          "type": "integral",
+          "named": true
+        },
+        {
+          "type": "new",
+          "named": true
+        },
+        {
+          "type": "path",
+          "named": true
+        },
+        {
+          "type": "register",
+          "named": true
+        },
+        {
+          "type": "rune",
+          "named": true
+        },
+        {
+          "type": "slice",
+          "named": true
+        },
+        {
+          "type": "string",
+          "named": true
+        },
+        {
+          "type": "truth",
+          "named": true
+        },
+        {
+          "type": "unary",
+          "named": true
+        },
+        {
+          "type": "when",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "array",
     "named": true,
     "fields": {},
@@ -237,6 +316,10 @@
         },
         {
           "type": "dereference",
+          "named": true
+        },
+        {
+          "type": "group",
           "named": true
         },
         {
@@ -295,14 +378,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -328,6 +403,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -393,6 +472,10 @@
             "named": true
           },
           {
+            "type": "signature_type",
+            "named": true
+          },
+          {
             "type": "slice_type",
             "named": true
           }
@@ -408,14 +491,6 @@
         "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "access",
             "named": true
@@ -442,6 +517,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -573,14 +652,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -606,6 +677,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -705,6 +780,10 @@
           "named": true
         },
         {
+          "type": "group",
+          "named": true
+        },
+        {
           "type": "index",
           "named": true
         },
@@ -776,14 +855,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -821,6 +892,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -890,14 +965,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -923,6 +990,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -977,18 +1048,20 @@
     "type": "call",
     "named": true,
     "fields": {
-      "argument": {
-        "multiple": true,
-        "required": false,
+      "arguments": {
+        "multiple": false,
+        "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
+            "type": "arguments",
+            "named": true
+          }
+        ]
+      },
+      "function": {
+        "multiple": false,
+        "required": true,
+        "types": [
           {
             "type": "access",
             "named": true
@@ -1015,6 +1088,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -1062,16 +1139,6 @@
             "named": true
           }
         ]
-      },
-      "function": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "path",
-            "named": true
-          }
-        ]
       }
     }
   },
@@ -1096,6 +1163,10 @@
             "named": true
           },
           {
+            "type": "signature_type",
+            "named": true
+          },
+          {
             "type": "slice_type",
             "named": true
           }
@@ -1105,14 +1176,6 @@
         "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "access",
             "named": true
@@ -1139,6 +1202,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -1244,14 +1311,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -1277,6 +1336,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -1330,14 +1393,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -1363,6 +1418,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -1417,16 +1476,6 @@
     "type": "data",
     "named": true,
     "fields": {
-      "field": {
-        "multiple": true,
-        "required": true,
-        "types": [
-          {
-            "type": "field",
-            "named": true
-          }
-        ]
-      },
       "name": {
         "multiple": false,
         "required": true,
@@ -1437,139 +1486,26 @@
           }
         ]
       }
-    }
-  },
-  {
-    "type": "dereference",
-    "named": true,
-    "fields": {},
+    },
     "children": {
-      "multiple": false,
+      "multiple": true,
       "required": true,
       "types": [
         {
-          "type": "access",
-          "named": true
-        },
-        {
-          "type": "array",
-          "named": true
-        },
-        {
-          "type": "binary",
-          "named": true
-        },
-        {
-          "type": "block",
-          "named": true
-        },
-        {
-          "type": "call",
-          "named": true
-        },
-        {
-          "type": "cast",
-          "named": true
-        },
-        {
-          "type": "dereference",
-          "named": true
-        },
-        {
-          "type": "index",
-          "named": true
-        },
-        {
-          "type": "integral",
-          "named": true
-        },
-        {
-          "type": "new",
-          "named": true
-        },
-        {
-          "type": "path",
-          "named": true
-        },
-        {
-          "type": "register",
-          "named": true
-        },
-        {
-          "type": "rune",
-          "named": true
-        },
-        {
-          "type": "slice",
-          "named": true
-        },
-        {
-          "type": "string",
-          "named": true
-        },
-        {
-          "type": "truth",
-          "named": true
-        },
-        {
-          "type": "unary",
-          "named": true
-        },
-        {
-          "type": "when",
+          "type": "variable",
           "named": true
         }
       ]
     }
   },
   {
-    "type": "field",
+    "type": "dereference",
     "named": true,
     "fields": {
-      "name": {
+      "value": {
         "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      },
-      "type": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "array_type",
-            "named": true
-          },
-          {
-            "type": "path",
-            "named": true
-          },
-          {
-            "type": "pointer",
-            "named": true
-          },
-          {
-            "type": "slice_type",
-            "named": true
-          }
-        ]
-      },
-      "value": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "access",
             "named": true
@@ -1596,6 +1532,108 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
+            "named": true
+          },
+          {
+            "type": "index",
+            "named": true
+          },
+          {
+            "type": "integral",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "path",
+            "named": true
+          },
+          {
+            "type": "register",
+            "named": true
+          },
+          {
+            "type": "rune",
+            "named": true
+          },
+          {
+            "type": "slice",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "truth",
+            "named": true
+          },
+          {
+            "type": "unary",
+            "named": true
+          },
+          {
+            "type": "when",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "field",
+    "named": true,
+    "fields": {
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "access",
+            "named": true
+          },
+          {
+            "type": "array",
+            "named": true
+          },
+          {
+            "type": "binary",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "cast",
+            "named": true
+          },
+          {
+            "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -1650,28 +1688,66 @@
     "type": "function",
     "named": true,
     "fields": {
-      "annotation": {
+      "convention": {
         "multiple": false,
         "required": false,
         "types": [
           {
-            "type": "annotation",
+            "type": "identifier",
             "named": true
           }
         ]
       },
-      "block": {
+      "name": {
         "multiple": false,
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "return": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "array_type",
+            "named": true
           },
           {
-            "type": ")",
-            "named": false
+            "type": "path",
+            "named": true
           },
+          {
+            "type": "pointer",
+            "named": true
+          },
+          {
+            "type": "signature_type",
+            "named": true
+          },
+          {
+            "type": "slice_type",
+            "named": true
+          }
+        ]
+      },
+      "root": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "root",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
           {
             "type": "access",
             "named": true
@@ -1698,6 +1774,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -1745,77 +1825,21 @@
             "named": true
           }
         ]
-      },
-      "convention": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      },
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      },
-      "parameter": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "parameter",
-            "named": true
-          },
-          {
-            "type": "register",
-            "named": true
-          }
-        ]
-      },
-      "return": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "array_type",
-            "named": true
-          },
-          {
-            "type": "path",
-            "named": true
-          },
-          {
-            "type": "pointer",
-            "named": true
-          },
-          {
-            "type": "register",
-            "named": true
-          },
-          {
-            "type": "slice_type",
-            "named": true
-          }
-        ]
-      },
-      "root": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "root",
-            "named": true
-          }
-        ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "annotation",
+          "named": true
+        },
+        {
+          "type": "variable",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -1836,14 +1860,6 @@
         "multiple": false,
         "required": true,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "access",
             "named": true
@@ -1870,6 +1886,98 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
+            "named": true
+          },
+          {
+            "type": "index",
+            "named": true
+          },
+          {
+            "type": "integral",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "path",
+            "named": true
+          },
+          {
+            "type": "register",
+            "named": true
+          },
+          {
+            "type": "rune",
+            "named": true
+          },
+          {
+            "type": "slice",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "truth",
+            "named": true
+          },
+          {
+            "type": "unary",
+            "named": true
+          },
+          {
+            "type": "when",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "group",
+    "named": true,
+    "fields": {
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "access",
+            "named": true
+          },
+          {
+            "type": "array",
+            "named": true
+          },
+          {
+            "type": "binary",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "cast",
+            "named": true
+          },
+          {
+            "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -1934,14 +2042,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -1967,6 +2067,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -2020,14 +2124,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -2053,6 +2149,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -2139,6 +2239,10 @@
             "named": true
           },
           {
+            "type": "signature_type",
+            "named": true
+          },
+          {
             "type": "slice_type",
             "named": true
           }
@@ -2148,14 +2252,6 @@
         "multiple": false,
         "required": false,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "access",
             "named": true
@@ -2182,6 +2278,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -2236,16 +2336,6 @@
     "type": "load",
     "named": true,
     "fields": {
-      "annotation": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "annotation",
-            "named": true
-          }
-        ]
-      },
       "as": {
         "multiple": false,
         "required": false,
@@ -2265,7 +2355,7 @@
         "required": true,
         "types": [
           {
-            "type": "identifier",
+            "type": "path",
             "named": true
           },
           {
@@ -2308,22 +2398,22 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "annotation",
+          "named": true
+        }
+      ]
     }
   },
   {
     "type": "module",
     "named": true,
     "fields": {
-      "annotation": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "annotation",
-            "named": true
-          }
-        ]
-      },
       "name": {
         "multiple": false,
         "required": true,
@@ -2339,6 +2429,10 @@
       "multiple": true,
       "required": true,
       "types": [
+        {
+          "type": "annotation",
+          "named": true
+        },
         {
           "type": "data",
           "named": true
@@ -2370,64 +2464,12 @@
     "type": "new",
     "named": true,
     "fields": {
-      "field": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "field",
-            "named": true
-          },
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      },
-      "path": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "path",
-            "named": true
-          },
-          {
-            "type": "slice_type",
-            "named": true
-          }
-        ]
-      }
-    }
-  },
-  {
-    "type": "parameter",
-    "named": true,
-    "fields": {
-      "name": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
-          }
-        ]
-      },
       "type": {
         "multiple": false,
         "required": true,
         "types": [
           {
-            "type": "array_type",
-            "named": true
-          },
-          {
             "type": "path",
-            "named": true
-          },
-          {
-            "type": "pointer",
             "named": true
           },
           {
@@ -2436,6 +2478,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "field",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -2456,28 +2508,33 @@
   {
     "type": "pointer",
     "named": true,
-    "fields": {},
-    "children": {
-      "multiple": false,
-      "required": true,
-      "types": [
-        {
-          "type": "array_type",
-          "named": true
-        },
-        {
-          "type": "path",
-          "named": true
-        },
-        {
-          "type": "pointer",
-          "named": true
-        },
-        {
-          "type": "slice_type",
-          "named": true
-        }
-      ]
+    "fields": {
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "array_type",
+            "named": true
+          },
+          {
+            "type": "path",
+            "named": true
+          },
+          {
+            "type": "pointer",
+            "named": true
+          },
+          {
+            "type": "signature_type",
+            "named": true
+          },
+          {
+            "type": "slice_type",
+            "named": true
+          }
+        ]
+      }
     }
   },
   {
@@ -2493,14 +2550,6 @@
         "multiple": false,
         "required": false,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "access",
             "named": true
@@ -2527,6 +2576,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -2586,14 +2639,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -2619,6 +2664,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -2672,14 +2721,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -2705,6 +2746,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -2779,8 +2824,8 @@
           }
         ]
       },
-      "parameter": {
-        "multiple": true,
+      "return": {
+        "multiple": false,
         "required": false,
         "types": [
           {
@@ -2796,7 +2841,37 @@
             "named": true
           },
           {
+            "type": "signature_type",
+            "named": true
+          },
+          {
             "type": "slice_type",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "variable",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "signature_type",
+    "named": true,
+    "fields": {
+      "convention": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "identifier",
             "named": true
           }
         ]
@@ -2818,11 +2893,25 @@
             "named": true
           },
           {
+            "type": "signature_type",
+            "named": true
+          },
+          {
             "type": "slice_type",
             "named": true
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "variable",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -2833,14 +2922,6 @@
         "multiple": false,
         "required": false,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "access",
             "named": true
@@ -2867,6 +2948,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -2920,14 +3005,6 @@
         "required": false,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -2953,6 +3030,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -3006,14 +3087,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -3039,6 +3112,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -3110,6 +3187,10 @@
             "named": true
           },
           {
+            "type": "signature_type",
+            "named": true
+          },
+          {
             "type": "slice_type",
             "named": true
           }
@@ -3167,16 +3248,6 @@
     "type": "static",
     "named": true,
     "fields": {
-      "annotation": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "annotation",
-            "named": true
-          }
-        ]
-      },
       "name": {
         "multiple": false,
         "required": true,
@@ -3204,6 +3275,10 @@
             "named": true
           },
           {
+            "type": "signature_type",
+            "named": true
+          },
+          {
             "type": "slice_type",
             "named": true
           }
@@ -3213,14 +3288,6 @@
         "multiple": false,
         "required": false,
         "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
           {
             "type": "access",
             "named": true
@@ -3247,6 +3314,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -3295,6 +3366,16 @@
           }
         ]
       }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "annotation",
+          "named": true
+        }
+      ]
     }
   },
   {
@@ -3337,14 +3418,6 @@
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
             "type": "access",
             "named": true
           },
@@ -3370,6 +3443,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -3424,12 +3501,12 @@
     "type": "use",
     "named": true,
     "fields": {
-      "annotation": {
+      "name": {
         "multiple": false,
         "required": false,
         "types": [
           {
-            "type": "annotation",
+            "type": "identifier",
             "named": true
           }
         ]
@@ -3443,29 +3520,59 @@
             "named": true
           }
         ]
-      },
-      "use": {
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "identifier",
+          "named": true
+        },
+        {
+          "type": "wildcard",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "variable",
+    "named": true,
+    "fields": {
+      "name": {
         "multiple": false,
         "required": true,
         "types": [
           {
-            "type": ".",
-            "named": false
-          },
-          {
-            "type": "as",
-            "named": false
-          },
-          {
             "type": "identifier",
             "named": true
-          },
+          }
+        ]
+      },
+      "type": {
+        "multiple": false,
+        "required": true,
+        "types": [
           {
-            "type": "string",
+            "type": "array_type",
             "named": true
           },
           {
-            "type": "wild",
+            "type": "path",
+            "named": true
+          },
+          {
+            "type": "pointer",
+            "named": true
+          },
+          {
+            "type": "signature_type",
+            "named": true
+          },
+          {
+            "type": "slice_type",
             "named": true
           }
         ]
@@ -3491,18 +3598,92 @@
     "type": "while",
     "named": true,
     "fields": {
-      "block": {
+      "condition": {
         "multiple": false,
         "required": true,
         "types": [
           {
-            "type": "(",
-            "named": false
+            "type": "access",
+            "named": true
           },
           {
-            "type": ")",
-            "named": false
+            "type": "array",
+            "named": true
           },
+          {
+            "type": "binary",
+            "named": true
+          },
+          {
+            "type": "block",
+            "named": true
+          },
+          {
+            "type": "call",
+            "named": true
+          },
+          {
+            "type": "cast",
+            "named": true
+          },
+          {
+            "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
+            "named": true
+          },
+          {
+            "type": "index",
+            "named": true
+          },
+          {
+            "type": "integral",
+            "named": true
+          },
+          {
+            "type": "new",
+            "named": true
+          },
+          {
+            "type": "path",
+            "named": true
+          },
+          {
+            "type": "register",
+            "named": true
+          },
+          {
+            "type": "rune",
+            "named": true
+          },
+          {
+            "type": "slice",
+            "named": true
+          },
+          {
+            "type": "string",
+            "named": true
+          },
+          {
+            "type": "truth",
+            "named": true
+          },
+          {
+            "type": "unary",
+            "named": true
+          },
+          {
+            "type": "when",
+            "named": true
+          }
+        ]
+      },
+      "value": {
+        "multiple": false,
+        "required": true,
+        "types": [
           {
             "type": "access",
             "named": true
@@ -3541,6 +3722,10 @@
           },
           {
             "type": "dereference",
+            "named": true
+          },
+          {
+            "type": "group",
             "named": true
           },
           {
@@ -3601,92 +3786,6 @@
           },
           {
             "type": "while",
-            "named": true
-          }
-        ]
-      },
-      "condition": {
-        "multiple": false,
-        "required": true,
-        "types": [
-          {
-            "type": "(",
-            "named": false
-          },
-          {
-            "type": ")",
-            "named": false
-          },
-          {
-            "type": "access",
-            "named": true
-          },
-          {
-            "type": "array",
-            "named": true
-          },
-          {
-            "type": "binary",
-            "named": true
-          },
-          {
-            "type": "block",
-            "named": true
-          },
-          {
-            "type": "call",
-            "named": true
-          },
-          {
-            "type": "cast",
-            "named": true
-          },
-          {
-            "type": "dereference",
-            "named": true
-          },
-          {
-            "type": "index",
-            "named": true
-          },
-          {
-            "type": "integral",
-            "named": true
-          },
-          {
-            "type": "new",
-            "named": true
-          },
-          {
-            "type": "path",
-            "named": true
-          },
-          {
-            "type": "register",
-            "named": true
-          },
-          {
-            "type": "rune",
-            "named": true
-          },
-          {
-            "type": "slice",
-            "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          },
-          {
-            "type": "truth",
-            "named": true
-          },
-          {
-            "type": "unary",
-            "named": true
-          },
-          {
-            "type": "when",
             "named": true
           }
         ]
@@ -3906,7 +4005,7 @@
     "named": false
   },
   {
-    "type": "wild",
+    "type": "wildcard",
     "named": true
   },
   {

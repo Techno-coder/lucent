@@ -3,7 +3,7 @@ Literals
 =====================================
 
 fn function()
-	0
+	-0
 	0x0
 	0xabc'def
 	0o01234567
@@ -34,7 +34,7 @@ fn function()
 
 (source (function
 	name: (identifier)
-	block: (block
+	value: (block
 		(let name: (identifier)
 			type: (path (identifier))
 			value: (path (identifier)))
@@ -60,7 +60,8 @@ fn function()
 	(identifier) (block
 		(binary (integral) (integral))
 		(binary (integral) (binary (integral) (integral)))
-		(binary (integral) (binary (integral) (integral)))
+		(binary (integral) (group
+			(binary (integral) (integral))))
 		(binary (integral) (binary (binary
 			(integral) (integral)) (integral))))))
 
@@ -69,7 +70,7 @@ Unary expressions
 =====================================
 
 fn function()
-	-1 + &identifier
+	--1 + &identifier
 	!true
 
 ---
@@ -108,13 +109,16 @@ fn function()
 ---
 
 (source (function
-	name: (identifier) block: (block
-		(call function: (path (identifier)))
-		(let name: (identifier)
-			value: (call function: (path (identifier))))
+	name: (identifier) value: (block
 		(call function: (path (identifier))
-			argument: (integral) argument: (truth)
-			argument: (call function: (path (identifier)))))))
+			arguments: (arguments))
+		(let name: (identifier)
+			value: (call function: (path (identifier))
+				arguments: (arguments)))
+		(call function: (path (identifier))
+			arguments: (arguments (integral) (truth)
+			(call function: (path (identifier))
+				arguments: (arguments)))))))
 
 =====================================
 Function returns
@@ -186,6 +190,27 @@ fn function()
 			(path (identifier))) (identifier))))))
 
 =====================================
+Function pointers
+=====================================
+
+fn function()
+	let pointer: fn(argument: type) type = 0 as _
+	pointer(argument).method()
+
+---
+
+(source (function
+	(identifier) (block
+		(let (identifier)
+			(signature_type
+				(variable (identifier) (path (identifier)))
+				(path (identifier)))
+			(cast (integral) (path (identifier))))
+		(call (access (call (path (identifier))
+			(arguments (path (identifier))))
+			(identifier)) (arguments)))))
+
+=====================================
 If expressions
 =====================================
 
@@ -252,7 +277,7 @@ fn function()
 	(identifier) (block
 		(new (path (identifier))
 			(field (identifier) (truth))
-			(identifier)))))
+			(field (identifier))))))
 
 =====================================
 Slice construction
@@ -282,7 +307,7 @@ fn function()
 	(identifier) (block
 		(new (path (identifier))
 			(field (identifier)
-				(new (path (identifier))))
+				(group (new (path (identifier)))))
 			(field (identifier)
 				(new (path (identifier))))))))
 
@@ -300,8 +325,8 @@ fn function()
 (source (function
 	(identifier) (block
 		(path (identifier) (identifier))
-		(access (path (identifier)) (identifier))
-		(access (access (path (identifier))
+		(access (group (path (identifier))) (identifier))
+		(access (access (group (path (identifier)))
 			(identifier)) (identifier)))))
 
 =====================================
@@ -318,8 +343,8 @@ fn function()
 (source (function
 	(identifier) (block
 		(set (path (identifier)) (truth))
-		(set (dereference (call (path (identifier))))
-			(block (truth))))))
+		(set (dereference (call (path (identifier))
+			(arguments))) (block (truth))))))
 
 =====================================
 Compound assignment

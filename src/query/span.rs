@@ -4,13 +4,14 @@ use std::ops::Range;
 use codespan::FileId;
 use codespan_reporting::diagnostic;
 
-use crate::parse::SymbolPath;
+use crate::node::{FPath, Path, Symbol};
+use crate::parse::TSpan;
 
-use super::Label;
+use super::{Label, QScope};
 
 /// Represents a fully resolved source code location.
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-pub struct Span(Option<(FileId, codespan::Span)>);
+pub struct Span(pub(super) Option<(FileId, codespan::Span)>);
 
 impl Span {
 	pub fn new(file: codespan::FileId, range: Range<usize>) -> Self {
@@ -72,7 +73,7 @@ impl ISpan {
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum ESpan {
 	Span(Span),
-	Item(SymbolPath, ISpan),
+	Item(Symbol, ISpan),
 }
 
 impl ESpan {
@@ -82,6 +83,25 @@ impl ESpan {
 
 	pub fn other(&self) -> Label {
 		Label::new(diagnostic::LabelStyle::Secondary, self.clone())
+	}
+
+	pub fn lift(self, scope: QScope) -> Span {
+		match self {
+			ESpan::Span(span) => span,
+			ESpan::Item(symbol, span) => {
+				let module = symbol.module();
+				let symbols = crate::parse::symbols(scope, module);
+				symbols.map(|table| TSpan::lift(match &symbol {
+					Symbol::Module(Path::Node(_, name)) =>
+						&table.modules.get(name).map(|(span, _)| span).unwrap(),
+					Symbol::Function(FPath(Path::Node(_, name), index)) =>
+						&table.functions[name][*index],
+					Symbol::Static(Path::Node(_, name)) => &table.statics[name],
+					Symbol::Library(Path::Node(_, name)) => &table.libraries[name],
+					other => panic!("invalid symbol: {:?}", other),
+				}, span)).unwrap_or_else(|_| Span::internal())
+			}
+		}
 	}
 }
 

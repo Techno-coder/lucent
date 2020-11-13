@@ -13,6 +13,15 @@ pub struct Sources {
 }
 
 impl Sources {
+	pub fn files<F, R>(&self, function: F) -> R
+		where F: FnOnce(&Files<Arc<str>>) -> R {
+		function(&self.files.lock())
+	}
+
+	pub fn errors(&self, key: &key::Source) -> (Vec<E>, Vec<Key>) {
+		self.paths.errors(key)
+	}
+
 	pub fn invalidate(&self, key: &key::Source) -> Vec<Key> {
 		// TODO: remove key entry from files
 		self.paths.invalidate(key)
@@ -44,15 +53,15 @@ pub struct PSource<'a> {
 
 pub fn source(parent: QScope, path: &FilePath) -> crate::Result<Source> {
 	let label = parent.span.other();
-	let path = &path.canonicalize().map_err(|error| parent
-		.error(E::error().note(error.to_string()).label(label.clone())
-			.message(format!("failed to canonicalize path: {}", path.display()))))?;
+	let path = &path.canonicalize().map_err(|error| E::error()
+		.message(format!("failed to canonicalize path: {}", path.display()))
+		.note(error.to_string()).label(label.clone()).to(parent))?;
 
 	let paths = &parent.ctx.source.paths;
-	let file = *paths.scope(parent, key::Source(path.clone()), |scope| {
-		let string = std::fs::read_to_string(path).map_err(|error|
-			scope.error(E::error().note(error.to_string()).label(label)
-				.message(format!("failed to read file: {}", path.display()))))?;
+	let file = *paths.scope(parent, path.clone(), |scope| {
+		let string = std::fs::read_to_string(path).map_err(|error| E::error()
+			.message(format!("failed to read file: {}", path.display()))
+			.note(error.to_string()).label(label).to(scope))?;
 		let (name, string) = (path.file_name().unwrap(), string.into());
 		Ok(Arc::new(scope.ctx.source.files.lock().add(name, string)))
 	})?;

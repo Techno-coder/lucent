@@ -1,18 +1,21 @@
 use codespan::FileId;
 use codespan_reporting::diagnostic;
 
-use super::ESpan;
+use super::{ESpan, MScope, QScope, QueryError, Span};
+
+type Diagnostic = diagnostic::Diagnostic<FileId>;
+type DiagnosticLabel = diagnostic::Label<FileId>;
 
 /// An error with source locations.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct E {
-	pub error: diagnostic::Diagnostic<FileId>,
+	pub error: Diagnostic,
 	pub labels: Vec<Label>,
 }
 
 impl E {
 	fn new(kind: diagnostic::Severity) -> Self {
-		let error = diagnostic::Diagnostic::new(kind);
+		let error = Diagnostic::new(kind);
 		Self { error, labels: vec![] }
 	}
 
@@ -34,6 +37,32 @@ impl E {
 		self.error.notes.push(note.into());
 		self
 	}
+
+	pub fn lift(mut self, scope: QScope) -> Diagnostic {
+		self.error.labels.extend(self.labels.into_iter()
+			.flat_map(|label| label.lift(scope)));
+		self.error
+	}
+}
+
+impl E {
+	/// Adds this error to the query.
+	pub fn emit(self, scope: MScope) {
+		scope.emit(self);
+	}
+
+	/// Adds this error to the query.
+	/// Returns `QueryError` for convenience.
+	pub fn to(self, scope: MScope) -> QueryError {
+		self.emit(scope);
+		QueryError::Failure
+	}
+
+	/// Adds this error to the query.
+	/// Returns `crate::Result` for convenience.
+	pub fn result<T>(self, scope: MScope) -> crate::Result<T> {
+		Err(self.to(scope))
+	}
 }
 
 #[derive(Debug, Clone)]
@@ -51,5 +80,12 @@ impl Label {
 	pub fn message(mut self, message: impl Into<String>) -> Self {
 		self.message = message.into();
 		self
+	}
+
+	pub fn lift(self, scope: QScope) -> Option<DiagnosticLabel> {
+		let Span(span) = self.span.lift(scope);
+		let (file, span) = span?;
+		let label = DiagnosticLabel::new(self.style, file, span);
+		Some(label.with_message(self.message))
 	}
 }

@@ -1,75 +1,109 @@
-use tree_sitter::{Query, QueryCursor, TreeCursor};
+use tree_sitter::TreeCursor;
 
 use crate::node::Identifier;
-use crate::query::Span;
+use crate::query::{E, ISpan, MScope, S, Span};
 
-use super::PSource;
+use super::{PSource, TSpan};
 
-pub struct Node<'a> {
+pub trait Node<'a>: Sized {
+	type Children: Iterator<Item=Self>;
+
+	fn children(&self) -> Self::Children;
+	fn attribute(&self, attribute: &str) -> Option<Self>;
+	fn text(&self) -> &'a str;
+	fn kind(&self) -> &'a str;
+	fn span(&self) -> Span;
+
+	fn field(&self, scope: MScope, field: &str) -> crate::Result<Self> {
+		self.attribute(field).ok_or_else(|| E::error()
+			.message(format!("missing node field: {}", field))
+			.label(self.span().label()).to(scope))
+	}
+
+	fn invalid<T>(&self, scope: MScope) -> crate::Result<T> {
+		let message = format!("invalid node type: {}", self.kind());
+		E::error().message(message).label(self.span().label()).result(scope)
+	}
+
+	fn identifier(&self, scope: MScope) -> crate::Result<Identifier> {
+		let text = self.field(scope, "name")?.text();
+		Ok(Identifier(text.into()))
+	}
+
+	fn identifier_span(&self, scope: MScope, span: &TSpan)
+					   -> crate::Result<S<Identifier>> {
+		let field = self.field(scope, "name")?;
+		let name = Identifier(field.text().into());
+		Ok(S::new(name, field.offset(span)))
+	}
+
+	fn offset(&self, span: &TSpan) -> ISpan {
+		TSpan::offset(span, self.span())
+	}
+}
+
+pub struct TreeNode<'a> {
 	node: tree_sitter::Node<'a>,
 	source: PSource<'a>,
 }
 
-impl<'a> Node<'a> {
+impl<'a> TreeNode<'a> {
 	pub fn new(node: tree_sitter::Node<'a>, source: PSource<'a>) -> Self {
 		Self { node, source }
 	}
+}
 
-	pub fn children(&self) -> NodeChildren {
-		NodeChildren::new(self)
+impl<'a> Node<'a> for TreeNode<'a> {
+	type Children = TreeNodeChildren<'a>;
+
+	fn children(&self) -> Self::Children {
+		TreeNodeChildren::new(self)
 	}
 
-	pub fn attribute(&self, attribute: &str) -> Option<Node<'a>> {
+	fn attribute(&self, attribute: &str) -> Option<Self> {
 		let node = self.node.child_by_field_name(attribute)?;
-		Some(Node::new(node, self.source))
+		Some(Self::new(node, self.source))
 	}
 
-	pub fn text(&self) -> &'a str {
+	fn text(&self) -> &'a str {
 		&self.source.text[self.node.byte_range()]
 	}
 
-	pub fn kind(&self) -> &'a str {
+	fn kind(&self) -> &'a str {
 		self.node.kind()
 	}
 
-	pub fn span(&self) -> Span {
+	fn span(&self) -> Span {
 		Span::new(self.source.file, self.node.byte_range())
 	}
+	//
+	// fn field(&self, scope: MScope, field: &str) -> crate::Result<Self> {
+	// 	self.attribute(field).ok_or_else(||
+	// 		self.invalid::<()>(scope).unwrap_err())
+	// }
+	//
+	// fn invalid<T>(&self, scope: MScope) -> crate::Result<T> {
+	// 	E::error().message("syntax error")
+	// 		.label(self.span().label()).result(scope)
+	// }
 }
 
-impl<'a> Node<'a> {
-	pub fn field(&self, field: &str) -> crate::Result<Node<'a>> {
-		Ok(self.attribute(field).unwrap_or_else(||
-			panic!("field: {}, does not exist", field)))
-	}
-
-	pub fn identifier(&self) -> crate::Result<Identifier> {
-		let text = self.field("name")?.text();
-		Ok(Identifier(text.to_owned()))
-	}
-}
-
-impl<'a> Node<'a> {
-	pub fn captures(&'a self, cursor: &'a mut QueryCursor,
-					query: &'a Query) -> impl Iterator<Item=Node<'a>> + 'a {
-		let captures = cursor.captures(query, self.node,
-			move |node| &self.source.text[node.byte_range()]);
-		let captures = captures.flat_map(|(capture, _)| capture.captures);
-		captures.map(move |capture| Node::new(capture.node, self.source))
-	}
-}
-
-pub struct NodeChildren<'a, 'b> {
+pub struct TreeNodeChildren<'a> {
 	cursor: TreeCursor<'a>,
-	node: &'b Node<'a>,
+	source: PSource<'a>,
 	end: bool,
 }
 
-impl<'a, 'b> NodeChildren<'a, 'b> {
-	fn new(node: &'b Node<'a>) -> Self {
+impl<'a> TreeNodeChildren<'a> {
+	fn new(node: &TreeNode<'a>) -> Self {
 		let mut cursor = node.node.walk();
 		cursor.goto_first_child();
-		Self { cursor, node, end: false }
+
+		Self {
+			cursor,
+			source: node.source,
+			end: false,
+		}
 	}
 
 	fn advance(&mut self) {
@@ -77,8 +111,8 @@ impl<'a, 'b> NodeChildren<'a, 'b> {
 	}
 }
 
-impl<'a, 'b> Iterator for NodeChildren<'a, 'b> {
-	type Item = Node<'a>;
+impl<'a> Iterator for TreeNodeChildren<'a> {
+	type Item = TreeNode<'a>;
 
 	fn next(&mut self) -> Option<Self::Item> {
 		if self.end { return None; }
@@ -86,7 +120,7 @@ impl<'a, 'b> Iterator for NodeChildren<'a, 'b> {
 		self.advance();
 
 		match node.is_named() && !node.is_extra() {
-			true => Some(Node::new(node, self.node.source)),
+			true => Some(TreeNode::new(node, self.source)),
 			false => self.next(),
 		}
 	}

@@ -62,88 +62,68 @@ module.exports = grammar({
 
         _load_string: $ => seq(
             field('module', $.string),
-            choice(
-                seq('as', field('name', $.identifier)),
-                seq('with', field('with', $.string),
-                    optional(seq('as', field('name', $.identifier))))
-            )
+            'as', field('name', $.identifier),
+            optional(seq('with', field('with', $.string))),
         ),
 
+        _load_path: $ => repeat1(seq($.identifier, '.')),
         _load_symbol: $ => seq(
-            field('module', $.identifier),
-            '.', field('target', choice($.identifier, $.integral)),
+            field('module', alias($._load_path, $.path)),
+            field('target', choice($.identifier, $.integral)),
             'as', field('as', choice(
-                alias($.parameter, $.static),
+                alias($.variable, $.static),
                 $.signature,
             )),
         ),
 
-        signature: $ => seq(
-            field('convention', optional($.identifier)),
-            'fn', field('name', $.identifier),
-            seq('(', separated(',', field('parameter', $._type)), ')'),
-            field('return', optional($._type)),
-        ),
-
-        use: $ => seq(annotations($), 'use',
-            field('use', choice($._use_string, $._use_path))),
-
-        _use_string: $ => seq(
-            field('path', $.string),
-            optional(seq('as', $.identifier)),
-        ),
+        use: $ => seq('use', choice($._use_string, $._use_path)),
+        _use_string: $ => seq(field('path', $.string),
+            optional(seq('as', field('name', $.identifier)))),
 
         _use_path: $ => seq($.identifier,
             repeat(seq('.', $.identifier)),
-            optional(seq('.', alias('*', $.wild)))
+            optional(choice(
+                seq('.', alias('*', $.wildcard)),
+                seq('as', field('name', $._identifier)),
+            )),
         ),
 
         data: $ => seq(
             'data', field('name', $.identifier),
-            enclose($, field('field', alias($.parameter, $.field))),
+            enclose($, $.variable),
         ),
 
         'function': $ => seq(annotations($),
-            field('root', optional(alias('root', $.root))),
-            field('convention', optional($.identifier)),
-            'fn', field('name', $.identifier),
-            seq('(', separated(',', field('parameter',
-                choice($.parameter, $.register))), ')'),
-            field('return', optional($._return_type)),
-            choice(field('block', $.block),
-                seq('=', field('block', $._value))),
+            optional(field('root',
+                alias('root', $.root))),
+            signature($, true),
+            choice(field('value', $.block),
+                seq('=', field('value', $._value))),
         ),
 
-        parameter: $ => seq(
+        variable: $ => seq(
             field('name', $.identifier),
             ':', field('type', $._type)
         ),
 
         'static': $ => seq(annotations($),
             'static', field('name', $.identifier),
-            choice(
-                seq(':', field('type', $._type)),
-                seq('=', field('value', $._value)),
-                seq(
-                    ':', field('type', $._type),
-                    '=', field('value', $._value),
-                ),
-            ),
-        ),
-
-        _return_type: $ => choice(
-            $.register,
-            $._type,
+            optional(seq(':', field('type', $._type))),
+            optional(seq('=', field('value', $._value))),
         ),
 
         _type: $ => choice(
+            $.signature_type,
             $.array_type,
             $.slice_type,
             $.pointer,
             $.path,
         ),
 
-        pointer: $ => seq('*', $._type),
+        signature: $ => signature($, true),
+        signature_type: $ => prec.right(signature($, false)),
+
+        pointer: $ => seq('*', field('type', $._type)),
         slice_type: $ => seq('[', field('type', $._type), ';]'),
         array_type: $ => seq(
             '[', field('type', $._type),
@@ -160,8 +140,7 @@ module.exports = grammar({
             $.while,
             $.let,
             $.set,
-            $._value
-            ,
+            $._value,
         )),
 
         'let': $ => prec.right(seq(
@@ -176,8 +155,7 @@ module.exports = grammar({
         )),
 
         compound: $ => prec.right(seq(
-            field('target', $._value)
-            ,
+            field('target', $._value),
             field('operator', choice(
                 choice('+', '-', '*', '/', '%'),
                 choice('&', '|', '^', '<<', '>>'),
@@ -189,7 +167,7 @@ module.exports = grammar({
 
         'while': $ => seq('while',
             field('condition', $._value),
-            ':', field('block', $._statement),
+            ':', field('value', $._statement),
         ),
 
         _value: $ => prec.right(choice(
@@ -207,7 +185,7 @@ module.exports = grammar({
             $.index,
             $.slice,
             $.access,
-            $._group,
+            $.group,
             $.block,
             $.when,
             $.path,
@@ -251,14 +229,15 @@ module.exports = grammar({
         },
 
         dereference: $ => prec(PRECEDENCE.access,
-            seq($._value, '!')),
+            seq(field('value', $._value), '!')),
 
         call: $ => seq(
-            field('function', $.path),
-            seq('(', separated(',',
-                field('argument', $._value)
-            ), ')')
+            field('function', choice($.path, $._value)),
+            field('arguments', $.arguments),
         ),
+
+        arguments: $ => seq('(',
+            separated(',', $._value), ')'),
 
         cast: $ => prec.right(seq(
             field('value', $._value),
@@ -278,45 +257,53 @@ module.exports = grammar({
 
         access: $ => prec(PRECEDENCE.access, seq(
             field('value', $._value), '.',
-            field('field', $.identifier),
+            field('name', $.identifier),
         )),
 
         new: $ => prec.right(seq('new',
-            field('path', choice($.path, $.slice_type)),
-            separated(',', prec.right(field('field',
-                choice($.identifier, $.field)))),
+            field('type', choice($.path, $.slice_type)),
+            separated(',', $.field),
         )),
 
         field: $ => prec.right(seq(
-            field('name', $.identifier), ':',
-            field('value', $._value),
+            field('name', $.identifier),
+            optional(seq(':', field('value', $._value))),
         )),
 
-        _group: $ => seq('(', $._value, ')'),
+        group: $ => seq('(', field('value', $._value), ')'),
         array: $ => seq('[', separated(',', $._value), ']'),
         path: $ => prec.right(seq($.identifier,
             repeat(seq('.', $.identifier)))),
 
-        integral: $ => choice(
+        integral: _ => choice(
             /0b[0-1]([0-1']*[0-1])?/,
             /0o[0-7]([0-7']*[0-7])?/,
             /0x[\da-f]([\da-f']*[\da-f])?/,
-            /\d([\d']*\d)?/,
+            /-?\d([\d']*\d)?/,
         ),
 
-        truth: $ => choice('true', 'false'),
+        truth: _ => choice('true', 'false'),
         register: $ => seq('$', $._identifier),
-        string: $ => /"(\\.|[^"])*"/,
-        rune: $ => /'(\\.|[^"])'/,
+        string: _ => /"(\\.|[^"])*"/,
+        rune: _ => /'(\\.|[^"])'/,
 
         identifier: $ => $._identifier,
-        _identifier: $ => /[^\x00-@\[-^`{-~][^\x00-&(-/:-@\[-^`{-~]*/,
-        _comment: $ => token(seq('//', /[^\n]*/)),
+        _identifier: _ => /[^\x00-@\[-^`{-~][^\x00-&(-/:-@\[-^`{-~]*/,
+        _comment: _ => token(seq('//', /[^\n]*/)),
     }
 });
 
 function annotations($) {
-    return field('annotation', repeat($.annotation));
+    return repeat($.annotation);
+}
+
+function signature($, named) {
+    return seq(
+        field('convention', optional($.identifier)),
+        'fn', (named ? field('name', $.identifier) : seq()),
+        seq('(', separated(',', $.variable), ')'),
+        field('return', optional($._type)),
+    );
 }
 
 function enclose($, rule) {
