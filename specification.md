@@ -409,10 +409,15 @@ use "./path.lc" as identifier
 ## Namespace management
 ```
 use path
-use path as identifier
 use path.*
 ```
-Namespace imports are effective after the position of import and only within the enclosing scope and file. Wildcards are allowed only as the last element in the path.
+Namespace imports are effective after the position of import and only within the enclosing scope and file. They must appear before any nested modules. Wildcards are allowed only as the last element in the path.
+
+### [Removed] Item aliasing
+```
+use path as identifier
+```
+Imported symbols can be aliased to an alternative name for the enclosing scope.
 
 ## Guarantees
 ### Function pruning

@@ -1,4 +1,4 @@
-use crate::node::{HType, Identifier, Path, Sign, Width};
+use crate::node::{HPath, HType, Identifier, Sign, Width};
 use crate::query::{E, MScope, S};
 
 use super::{Inclusions, Node, TSpan};
@@ -33,11 +33,12 @@ pub fn kind<'a>(scope: MScope, inclusions: &Inclusions, span: &TSpan,
 	}, TSpan::offset(span, node.span())))
 }
 
-fn path_kind<'a>(scope: MScope, inclusions: &Inclusions, span: &TSpan,
+fn path_kind<'a>(scope: MScope, inclusions: &Inclusions, base: &TSpan,
 				 node: &impl Node<'a>) -> crate::Result<HType> {
-	let path = super::path(scope, span, node)?.node;
-	if let Path::Node(module, Identifier(name)) = &path {
-		if matches!(module.as_ref(), Path::Root) {
+	let path = super::path(scope, base, node)?;
+	if let HPath::Node(module, name) = &path {
+		if module.as_ref() == &HPath::root() {
+			let Identifier(name) = &name.node;
 			match name.as_ref() {
 				"void" => return Ok(HType::Void),
 				"rune" => return Ok(HType::Rune),
@@ -57,7 +58,7 @@ fn path_kind<'a>(scope: MScope, inclusions: &Inclusions, span: &TSpan,
 	}
 
 	let scope = &mut scope.span(node.span());
-	let path = inclusions.structure(scope, &path)
+	let path = inclusions.structure(scope, base, &path)?
 		.ok_or_else(|| E::error().message("undefined type")
 			.label(scope.span.label()).to(scope))?;
 	Ok(HType::Structure(path))

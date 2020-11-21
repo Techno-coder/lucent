@@ -51,7 +51,8 @@ macro_rules! queries {
 
 queries! {
 	Compile() -> ();
-	Source(FilePath) -> codespan::FileId;
+	Read(FilePath) -> crate::source::File;
+	FileTable(FilePath) -> crate::server::FileTable;
 	Symbols(Path) -> crate::parse::SymbolTable;
 
 	ItemTable(Path) -> crate::parse::ItemTable;

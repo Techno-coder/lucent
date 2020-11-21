@@ -5,21 +5,22 @@ authors = ["Technocoder <8334328+Techno-coder@users.noreply.github.com>"]
 edition = "2018"
 
 [dependencies]
+lsp-server = "^0.4"
+serde_json = "*"
 tree-sitter = "^0.17"
 parking_lot = "^0.11"
 codespan-reporting = "^0.9"
-codespan = "^0.9"
+codespan-lsp = "^0.10"
 dashmap = "^3.0"
 indexmap = "^1.6"
 
-[dependencies.iced-x86]
-version = "^1.2"
+[dependencies.lsp-types]
+version = "^0.79"
+features = ["proposed"]
+
+[dependencies.clap]
+version = "^2.33"
 default-features = false
-features = [
-    "std",
-    "block_encoder",
-    "db",
-]
 
 [build-dependencies]
 cc = "*"

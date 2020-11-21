@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 use std::iter::FromIterator;
-use std::sync::Arc;
 
 use crate::node::*;
-use crate::query::{E, MScope, QScope, S};
+use crate::query::{E, MScope, QueryError, S};
 
 use super::{Inclusions, Node, TSpan};
 
@@ -68,8 +67,7 @@ fn valued<'a>(scene: &mut Scene, scope: MScope, inclusions: &Inclusions,
 			Some(rune) => HNode::Rune(rune),
 		}
 		"integral" => HNode::Integral(integral(scope, node)?),
-		"path" => paths(scene, scope, base, node,
-			|scope, path| inclusions.statics(scope, path))?.node,
+		"path" => paths(scene, scope, inclusions, base, node)?.node,
 		"block" => scene.scope(|scene| HNode::Block(node.children()
 			.map(|node| valued_node(scene, scope, node)).collect())),
 		"group" => HNode::Block(vec![valued(scene, scope, "value")?]),
@@ -132,7 +130,7 @@ fn valued<'a>(scene: &mut Scene, scope: MScope, inclusions: &Inclusions,
 			for field in node.children().filter(|node| node.kind() == "field") {
 				let name = field.identifier_span(scope, base)?;
 				let (name, span) = (name.node, name.span);
-				let value = node.attribute("value")
+				let value = field.attribute("value")
 					.map(|node| Ok(valued_node(scene, scope, node)));
 				let value = value.unwrap_or_else(|| scene.generation(&name)
 					.map(|index| HNode::Variable(Variable(name.clone(), index)))
@@ -155,10 +153,10 @@ fn valued<'a>(scene: &mut Scene, scope: MScope, inclusions: &Inclusions,
 				"path" => {
 					let scope = &mut scope.span(kind.span());
 					let node = super::path(scope, base, &kind)?;
-					let path = inclusions.structure(scope, &node.node)
+					let path = inclusions.structure(scope, base, &node)?
 						.ok_or_else(|| E::error().message("unresolved structure")
 							.label(kind.span().label()).to(scope))?;
-					HNode::New(S::new(path, node.span), fields)
+					HNode::New(path, fields)
 				}
 				"slice_type" => {
 					let kind = kind.field(scope, "type")?;
@@ -188,7 +186,7 @@ fn valued<'a>(scene: &mut Scene, scope: MScope, inclusions: &Inclusions,
 			.map(|node| valued_node(scene, scope, node)).collect())),
 		// path(value)
 		"call" => {
-			let arguments = node.children().filter(|node| node.kind() == "value")
+			let arguments = node.field(scope, "arguments")?.children()
 				.map(|node| valued_node(scene, scope, node)).collect();
 			let function = node.field(scope, "function")?;
 			if function.kind() != "path" {
@@ -196,11 +194,10 @@ fn valued<'a>(scene: &mut Scene, scope: MScope, inclusions: &Inclusions,
 				return Ok(HNode::Method(value, arguments));
 			}
 
-			let node = paths(scene, scope, base, &function,
-				|scope, path| inclusions.function(scope, path)
-					.or_else(|| inclusions.statics(scope, path)))?;
+			let node = paths(scene, scope, inclusions, base, &function)?;
 			match node.node {
-				HNode::Path(path) => HNode::Call(S::new(path, node.span), arguments),
+				HNode::Unresolved(_) | HNode::Error(_) => node.node,
+				HNode::Function(path) => HNode::Call(path, arguments),
 				_ => HNode::Method(scene.value.insert(node), arguments),
 			}
 		}
@@ -224,6 +221,7 @@ fn valued<'a>(scene: &mut Scene, scope: MScope, inclusions: &Inclusions,
 					.label(label.clone()).result(scope)?,
 			}
 		}
+		// value!
 		"dereference" => {
 			let value = valued(scene, scope, "value")?;
 			HNode::Unary(Unary::Dereference, value)
@@ -238,14 +236,17 @@ fn valued<'a>(scene: &mut Scene, scope: MScope, inclusions: &Inclusions,
 					.label(operator.span().label()).to(scope))?;
 			HNode::Binary(operator, left, right)
 		}
-		_ => return node.invalid(scope),
-	}))().unwrap_or_else(|_| HNode::Error);
+		_ => {
+			let _: crate::Result<()> = node.invalid(scope);
+			let value = |node| valued_node(scene, scope, node);
+			HNode::Error(node.children().map(value).collect())
+		}
+	}))().unwrap_or_else(|_: QueryError| HNode::Error(vec![]));
 	scene.value.insert(S::new(node, span))
 }
 
-fn paths<'a, F>(scene: &mut Scene, scope: MScope, base: &TSpan,
-				node: &impl Node<'a>, predicate: F) -> crate::Result<S<HNode>>
-	where F: Fn(QScope, &Path) -> Option<Path> {
+fn paths<'a>(scene: &mut Scene, scope: MScope, inclusions: &Inclusions,
+			 base: &TSpan, node: &impl Node<'a>) -> crate::Result<S<HNode>> {
 	let map_names = || node.children().map(|node|
 		(Identifier(node.text().into()), node.span()));
 	let field = |scene: &mut Scene, node, (name, span)| {
@@ -266,19 +267,27 @@ fn paths<'a, F>(scene: &mut Scene, scope: MScope, base: &TSpan,
 
 	// Find symbol at possible paths.
 	let mut names = map_names();
-	let mut path = Path::Root;
+	let mut path = HPath::root();
 	for (name, span) in &mut names {
 		let scope = &mut scope.span(span);
-		path = Path::Node(Arc::new(path), name);
-		if let Some(path) = predicate(scope, &path) {
-			let node = S::new(HNode::Path(path), TSpan::offset(base, span));
+		let name = S::new(name, TSpan::offset(base, span));
+		path = HPath::Node(Box::new(path), name);
+
+		let node = inclusions.function(scope, base, &path)
+			.map(|path| path.map(|path| HNode::Function(path))).transpose();
+		let node = node.or_else(|| inclusions.statics(scope, base, &path)
+			.map(|path| path.map(|path| HNode::Static(path))).transpose());
+		if let Some(node) = node.transpose()? {
+			let node = S::new(node, TSpan::offset(base, span));
 			let fields = |node, name| field(scene, node, name);
 			return Ok(names.fold(node, fields));
 		}
 	}
 
 	let error = E::error().message("unresolved path");
-	error.label(node.span().label()).result(scope)
+	error.label(node.span().label()).emit(scope);
+	let span = TSpan::offset(base, node.span());
+	Ok(S::new(HNode::Unresolved(path), span))
 }
 
 pub fn integral<'a>(scope: MScope, node: &impl Node<'a>) -> crate::Result<i128> {

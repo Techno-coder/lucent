@@ -28,6 +28,7 @@ pub struct HStatic {
 
 #[derive(Debug, PartialEq)]
 pub struct HData {
+	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
 	pub fields: HVariables,
 }
@@ -50,12 +51,13 @@ pub struct HSignature {
 #[derive(Debug, PartialEq)]
 pub struct HLibrary {
 	pub annotations: HAnnotations,
+	pub name: S<Identifier>,
 	pub path: FilePath,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct HLoadFunction {
-	pub library: S<Path>,
+	pub library: HPath,
 	pub reference: LoadReference,
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
@@ -64,16 +66,17 @@ pub struct HLoadFunction {
 
 #[derive(Debug, PartialEq)]
 pub struct HLoadStatic {
-	pub library: S<Path>,
+	pub library: HPath,
 	pub reference: LoadReference,
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
 	pub kind: S<HType>,
 }
 
-/// A high level abstract syntax tree node
-/// that closely resembles source code. All
-/// paths and variables are resolved and exist.
+/// A high level abstract syntax tree node that
+/// closely resembles source code. All paths and
+/// variables are resolved and exist with the
+/// exception of the `Unresolved` error variant.
 #[derive(Debug, PartialEq)]
 pub enum HNode {
 	Block(Vec<HIndex>),
@@ -85,10 +88,10 @@ pub enum HNode {
 	Return(Option<HIndex>),
 	Compile(HValue),
 	Inline(HValue),
-	Call(S<Path>, Vec<HIndex>),
+	Call(HPath, Vec<HIndex>),
 	Method(HIndex, Vec<HIndex>),
 	Field(HIndex, S<Identifier>),
-	New(S<Path>, HFields),
+	New(HPath, HFields),
 	SliceNew(S<HType>, HFields),
 	Slice(HIndex, Option<HIndex>, Option<HIndex>),
 	Index(HIndex, HIndex),
@@ -96,16 +99,18 @@ pub enum HNode {
 	Binary(HBinary, HIndex, HIndex),
 	Unary(Unary, HIndex),
 	Variable(Variable),
-	Path(Path),
+	Function(HPath),
+	Static(HPath),
 	String(String),
 	Register(Identifier),
 	Array(Vec<HIndex>),
 	Integral(i128),
 	Truth(bool),
 	Rune(char),
-	Continue,
 	Break,
-	Error,
+	Continue,
+	Unresolved(HPath),
+	Error(Vec<HIndex>),
 }
 
 #[derive(Debug, PartialEq)]
@@ -175,7 +180,7 @@ pub enum HType {
 	Rune,
 	Truth,
 	Never,
-	Structure(Path),
+	Structure(HPath),
 	Integral(Sign, Width),
 	Pointer(Box<S<HType>>),
 	Function(Box<HSignature>),

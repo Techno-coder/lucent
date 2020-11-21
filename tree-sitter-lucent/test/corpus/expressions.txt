@@ -312,6 +312,22 @@ fn function()
 				(new (path (identifier))))))))
 
 =====================================
+Complex construction
+=====================================
+
+fn function()
+	new A a: 1 + 2, b: "string"
+
+---
+
+(source (function
+	(identifier) (block
+		(new (path (identifier))
+			(field (identifier)
+				(binary (integral) (integral)))
+			(field (identifier) (string))))))
+
+=====================================
 Fields
 =====================================
 

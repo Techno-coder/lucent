@@ -1,11 +1,12 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use tree_sitter::{Language, Parser};
+use tree_sitter::{Language, Parser, Query};
 
 use crate::FilePath;
 use crate::node::*;
 use crate::query::{E, ISpan, MScope, QScope, S};
+use crate::source::{File, Source};
 
 use super::*;
 
@@ -18,62 +19,90 @@ pub fn parser() -> Parser {
 	parser
 }
 
-pub fn file_table(scope: QScope, symbols: &SymbolTable, mut inclusions: Inclusions,
-				  path: &FilePath) -> crate::Result<Arc<ItemTable>> {
-	let source = super::source(scope, path)?;
-	let tree = parser().parse(source.text.as_bytes(), None).unwrap();
-	let root = TreeNode::new(tree.root_node(), source.reference());
-	parse_table(scope, symbols, &mut inclusions, root, None)
+pub fn errors() -> Query {
+	let language = unsafe { tree_sitter_lucent() };
+	Query::new(language, "(ERROR) @error").unwrap()
 }
 
-pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: &mut Inclusions,
-					   node: impl Node<'a>, mut module: Option<(&TSpan, &mut HModule)>)
-					   -> crate::Result<Arc<ItemTable>> {
-	let mut table = ItemTable::default();
-	node.children().map(|node| Ok(match node.kind() {
+/// Contains references to `Source` instances.
+/// Designed to be copied without overhead during parsing.
+#[derive(Debug, Copy, Clone)]
+pub struct PSource<'a> {
+	pub text: &'a str,
+	pub file: File,
+}
+
+impl<'a> PSource<'a> {
+	pub fn new(source: &'a Source) -> Self {
+		Self {
+			text: &source.text,
+			file: source.file,
+		}
+	}
+}
+
+pub fn file_table(scope: QScope, symbols: &SymbolTable, inclusions: Inclusions,
+				  path: &FilePath) -> crate::Result<Arc<ItemTable>> {
+	let source = crate::source::source(scope, path)?;
+	let tree = parser().parse(source.text.as_bytes(), None).unwrap();
+	let root = TreeNode::new(tree.root_node(), PSource::new(&source));
+	Ok(parse_table(scope, symbols, inclusions, root))
+}
+
+pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: Inclusions,
+					   node: impl Node<'a>) -> Arc<ItemTable> {
+	let mut table = ItemTable::new(inclusions);
+	node.children().map(|node|
+		item(scope, symbols, &mut table, node)).last();
+	Arc::new(table)
+}
+
+fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
+			node: impl Node<'a>) -> crate::Result<()> {
+	let base = &symbols.span;
+	let inclusions = &mut table.inclusions;
+	Ok(match node.kind() {
 		"module" => {
 			let name = node.identifier(scope)?;
-			let (span, location) = &symbols.modules[&name];
+			let (_, location) = &symbols.modules[&name];
 			if let ModuleLocation::Inline(symbols) = location {
-				let mut module = HModule::default();
-				let scope_module = Some((span, &mut module));
-				let parsed = inclusions.scope(name.clone(), |inclusions|
-					parse_table(scope, symbols, inclusions, node, scope_module))?;
-				table.modules.insert(name, (Arc::new(module), parsed));
+				let inclusions = inclusions.scope(name.clone());
+				let parsed = parse_table(scope, symbols, inclusions, node);
+				table.modules.insert(name, parsed);
 			}
 		}
 		"use" => if node.attribute("path").is_none() {
+			let scope = &mut scope.span(node.span());
 			let mut children = node.children();
-			let mut target = Path::Root;
-			let span = node.span();
+			let mut target = HPath::root();
 			for child in &mut children {
 				match child.kind() {
 					"identifier" => {
 						let name = Identifier(child.text().into());
-						target = Path::Node(Arc::new(target), name);
+						let name = S::new(name, TSpan::offset(base, child.span()));
+						target = HPath::Node(Box::new(target), name);
 					}
 					"wildcard" => return match children.next().is_some() {
 						true => E::error().message("wildcard must appear last")
-							.label(span.label()).result(scope),
-						false => Ok(inclusions.wildcard(target)),
+							.label(node.span().label()).result(scope),
+						false => Ok(inclusions.wildcard(scope, target)?),
 					},
 					_ => child.invalid(scope)?,
 				}
 			}
-
-			let name = node.attribute("name");
-			let name = name.map(|name| Identifier(name.text().into()));
-			inclusions.specific(scope, name, span, target)?;
+			inclusions.specific(scope, base, target)?;
 		},
 		"load" => {
-			let identifier = node.identifier(scope)?;
+			let node = node.field(scope, "load")?;
 			let module = node.field(scope, "module")?;
 			match module.kind() {
 				"string" => {
 					// TODO: implement C header loading
+					let identifier = node.identifier(scope)?;
 					let span = &symbols.libraries[&identifier];
+					let name = node.identifier_span(scope, span)?;
 					let annotations = annotations(scope, inclusions, span, &node)?;
-					let library = HLibrary { annotations, path: module.text().into() };
+					let library = HLibrary { annotations, name, path: module.text().into() };
 					table.libraries.insert(identifier, Arc::new(library));
 				}
 				"path" => {
@@ -93,10 +122,19 @@ pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: &mut In
 					};
 
 					let symbol = node.field(scope, "as")?;
+					let identifier = symbol.identifier(scope)?;
+					let library = &mut |scope: MScope, base| {
+						let path = path(scope, base, &module)?;
+						let scope = &mut scope.span(module.span());
+						inclusions.library(scope, base, &path)?
+							.ok_or_else(|| E::error().message("undefined library")
+								.label(scope.span.label()).to(scope))
+					};
+
 					match symbol.kind() {
 						"static" => {
 							let span = &symbols.statics[&identifier];
-							let library = path(scope, span, &module)?;
+							let library = library(scope, base)?;
 							let annotations = annotations(scope, inclusions, span, &node)?;
 							let (name, kind) = super::variable(scope, inclusions, span, node)?;
 							let load = HLoadStatic { library, reference, annotations, name, kind };
@@ -108,7 +146,7 @@ pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: &mut In
 							let annotations = annotations(scope, inclusions, span, &node)?;
 							let signature = signature(scope, inclusions, span, &node)?;
 							let name = symbol.identifier_span(scope, span)?;
-							let library = path(scope, span, &module)?;
+							let library = library(scope, span)?;
 							let function = HLoadFunction {
 								library,
 								reference,
@@ -148,9 +186,10 @@ pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: &mut In
 		"data" => {
 			let identifier = node.identifier(scope)?;
 			let span = &symbols.structures[&identifier];
-			let fields = super::variables(scope, inclusions, span, &node)?;
 			let name = node.identifier_span(scope, span)?;
-			let data = Arc::new(HData { name, fields });
+			let fields = super::variables(scope, inclusions, span, &node)?;
+			let annotations = annotations(scope, inclusions, span, &node)?;
+			let data = Arc::new(HData { annotations, name, fields });
 			table.structures.insert(identifier, data);
 		}
 		"static" => {
@@ -173,10 +212,8 @@ pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: &mut In
 			table.statics.insert(identifier, Arc::new(statics));
 		}
 		"annotation" => {
-			let (span, module) = module.as_mut().ok_or_else(|| E::error()
-				.message("annotation has no associated item").label(node.span().label())
-				.note("global annotations must use: global_annotation").to(scope))?;
-			annotation(scope, inclusions, &mut module.annotations, span, node)?;
+			let module = Arc::get_mut(&mut table.module).unwrap();
+			annotation(scope, inclusions, &mut module.annotations, base, node)?;
 		}
 		"global_annotation" => {
 			let identifier = node.field(scope, "name")?;
@@ -189,17 +226,23 @@ pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: &mut In
 			table.global_annotations.push((name, span, value));
 		}
 		_ => (),
-	})).last();
-	Ok(Arc::new(table))
+	})
 }
 
-pub fn path<'a>(scope: MScope, span: &TSpan, node: &impl Node<'a>) -> crate::Result<S<Path>> {
-	let path = node.children().fold(Path::Root, |path, identifier|
-		Path::Node(Arc::new(path), Identifier(identifier.text().into())));
+pub fn path<'a>(scope: MScope, span: &TSpan,
+				node: &impl Node<'a>) -> crate::Result<HPath> {
+	let path = node.children().fold(HPath::root(), |path, name| {
+		let span = TSpan::offset(span, name.span());
+		let name = Identifier(name.text().into());
+		HPath::Node(Box::new(path), S::new(name, span))
+	});
+
 	match path {
-		Path::Node(_, _) => Ok(S::new(path, TSpan::offset(span, node.span()))),
-		Path::Root => E::error().message("path cannot be empty")
-			.label(node.span().label()).result(scope),
+		HPath::Node(_, _) => Ok(path),
+		HPath::Root(_) => E::error()
+			.message("path cannot be empty")
+			.label(node.span().label())
+			.result(scope),
 	}
 }
 

@@ -2336,9 +2336,75 @@
     "type": "load",
     "named": true,
     "fields": {
-      "as": {
+      "load": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "load_string",
+            "named": true
+          },
+          {
+            "type": "load_symbol",
+            "named": true
+          }
+        ]
+      }
+    },
+    "children": {
+      "multiple": true,
+      "required": false,
+      "types": [
+        {
+          "type": "annotation",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "load_string",
+    "named": true,
+    "fields": {
+      "module": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
+      "name": {
+        "multiple": false,
+        "required": true,
+        "types": [
+          {
+            "type": "identifier",
+            "named": true
+          }
+        ]
+      },
+      "with": {
         "multiple": false,
         "required": false,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      }
+    }
+  },
+  {
+    "type": "load_symbol",
+    "named": true,
+    "fields": {
+      "as": {
+        "multiple": false,
+        "required": true,
         "types": [
           {
             "type": "signature",
@@ -2357,26 +2423,12 @@
           {
             "type": "path",
             "named": true
-          },
-          {
-            "type": "string",
-            "named": true
-          }
-        ]
-      },
-      "name": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "identifier",
-            "named": true
           }
         ]
       },
       "target": {
         "multiple": false,
-        "required": false,
+        "required": true,
         "types": [
           {
             "type": "identifier",
@@ -2387,27 +2439,7 @@
             "named": true
           }
         ]
-      },
-      "with": {
-        "multiple": false,
-        "required": false,
-        "types": [
-          {
-            "type": "string",
-            "named": true
-          }
-        ]
       }
-    },
-    "children": {
-      "multiple": true,
-      "required": false,
-      "types": [
-        {
-          "type": "annotation",
-          "named": true
-        }
-      ]
     }
   },
   {

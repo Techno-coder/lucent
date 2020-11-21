@@ -1,22 +1,21 @@
 use std::fmt;
 use std::ops::Range;
 
-use codespan::FileId;
 use codespan_reporting::diagnostic;
 
 use crate::node::{FPath, Path, Symbol};
 use crate::parse::TSpan;
+use crate::source::File;
 
 use super::{Label, QScope};
 
 /// Represents a fully resolved source code location.
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-pub struct Span(pub(super) Option<(FileId, codespan::Span)>);
+pub struct Span(pub Option<(File, (usize, usize))>);
 
 impl Span {
-	pub fn new(file: codespan::FileId, range: Range<usize>) -> Self {
-		let range = range.start as u32..range.end as u32;
-		Self(Some((file, range.into())))
+	pub fn new(file: File, range: Range<usize>) -> Self {
+		Self(Some((file, (range.start, range.end))))
 	}
 
 	pub fn internal() -> Self {
@@ -32,22 +31,19 @@ impl Span {
 	}
 
 	pub fn offset(Self(span): Self, Self(relative): Self) -> ISpan {
-		let ((_, span), (_, relative)) = Option::zip(span, relative)
+		let ((_, (base, _)), (_, (start, end))) = Option::zip(span, relative)
 			.expect("cannot take offset on internal spans");
-		let range: Range<usize> = relative.into();
-		let base = span.start().to_usize() as isize;
-		let start = range.start as isize - base;
-		let end = range.end as isize - base;
+		let start = start as isize - base as isize;
+		let end = end as isize - base as isize;
 		ISpan(Some((start, end)))
 	}
 
 	pub fn lift(Self(span): Self, ISpan(relative): ISpan) -> Self {
-		let (file, span) = span.expect("cannot lift with internal span");
+		let (file, (base, _)) = span.expect("cannot lift with internal span");
 		Self(relative.map(|(start, end)| (file, {
-			let base = span.start().to_usize() as isize;
-			let start = (base + start) as u32;
-			let end = (base + end) as u32;
-			(start..end).into()
+			let start = (base as isize + start) as usize;
+			let end = (base as isize + end) as usize;
+			(start, end)
 		})))
 	}
 }
@@ -89,13 +85,21 @@ impl ESpan {
 		match self {
 			ESpan::Span(span) => span,
 			ESpan::Item(symbol, span) => {
-				let module = symbol.module();
-				let symbols = crate::parse::symbols(scope, module);
-				symbols.map(|table| TSpan::lift(match &symbol {
-					Symbol::Module(Path::Node(_, name)) =>
-						&table.modules.get(name).map(|(span, _)| span).unwrap(),
+				let module = match &symbol {
+					Symbol::Module(path) => path,
+					Symbol::Function(FPath(Path::Node(parent, _), _)) => parent,
+					Symbol::Structure(Path::Node(parent, _)) => parent,
+					Symbol::Static(Path::Node(parent, _)) => parent,
+					Symbol::Library(Path::Node(parent, _)) => parent,
+					other => panic!("invalid symbol: {:?}", other),
+				};
+
+				let table = crate::parse::symbols(scope, module);
+				table.map(|table| TSpan::lift(match &symbol {
+					Symbol::Module(_) => &table.span,
 					Symbol::Function(FPath(Path::Node(_, name), index)) =>
 						&table.functions[name][*index],
+					Symbol::Structure(Path::Node(_, name)) => &table.structures[name],
 					Symbol::Static(Path::Node(_, name)) => &table.statics[name],
 					Symbol::Library(Path::Node(_, name)) => &table.libraries[name],
 					other => panic!("invalid symbol: {:?}", other),

@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use tree_sitter::QueryCursor;
+
 use crate::FilePath;
 use crate::node::{FIndex, Identifier, Path};
 use crate::query::{E, ISpan, MScope, QScope, QueryError, Span};
 
-use super::{Node, TreeNode};
+use super::{Node, PSource, TreeNode};
 
 /// Stores the names of items contained within a module.
 /// The `PartialEq` implementation of this type is dependent
@@ -15,19 +17,34 @@ use super::{Node, TreeNode};
 /// Tables must always be updated on a file change (due to
 /// change in source locations) but invalidations only propagate
 /// if semantic data is mutated.
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct SymbolTable {
 	/// Contains an ordered list of location dependent symbols
 	/// in this module. Used for order dependent operations
 	/// such as code generation.
 	pub symbols: Vec<SymbolKey>,
-	pub modules: HashMap<Identifier, (TSpan, ModuleLocation)>,
+	pub modules: HashMap<Identifier, (Span, ModuleLocation)>,
 	/// Contains a list of locations for
 	/// functions with the same name.
 	pub functions: HashMap<Identifier, Vec<TSpan>>,
 	pub structures: HashMap<Identifier, TSpan>,
 	pub statics: HashMap<Identifier, TSpan>,
 	pub libraries: HashMap<Identifier, TSpan>,
+	pub span: TSpan,
+}
+
+impl SymbolTable {
+	pub fn new(span: TSpan) -> Self {
+		SymbolTable {
+			symbols: vec![],
+			modules: HashMap::new(),
+			functions: HashMap::new(),
+			structures: HashMap::new(),
+			statics: HashMap::new(),
+			libraries: HashMap::new(),
+			span,
+		}
+	}
 }
 
 /// A span transparent to equality. This should not
@@ -61,7 +78,6 @@ impl PartialEq for TSpan {
 pub enum SymbolKey {
 	Module(Identifier),
 	Function(Identifier, FIndex),
-	Structure(Identifier),
 	Static(Identifier),
 	Library(Identifier),
 }
@@ -93,69 +109,88 @@ pub fn try_symbols(parent: QScope, path: &Path) -> Option<Arc<SymbolTable>> {
 }
 
 fn file_symbols(parent: QScope, path: &FilePath) -> crate::Result<Arc<SymbolTable>> {
-	let source = super::source(parent, path)?;
+	let source = crate::source::source(parent, path)?;
 	let tree = super::parser().parse(source.text.as_bytes(), None).unwrap();
-	inline_table(parent, path, TreeNode::new(tree.root_node(), source.reference()))
+	let (root, source) = (tree.root_node(), PSource::new(&source));
+
+	let errors = &super::errors();
+	let mut cursor = QueryCursor::new();
+	let captures = cursor.captures(errors, root,
+		|node| &source.text[node.byte_range()]);
+	let captures = captures.flat_map(|(node, _)| node.captures);
+	for node in captures.map(|capture| capture.node) {
+		let node = TreeNode::new(node, source);
+		let error = E::error().message("syntax error");
+		error.label(node.span().label()).emit(parent);
+	}
+
+	let root = TreeNode::new(root, source);
+	inline_table(parent, path, root)
 }
 
 fn inline_table<'a>(scope: MScope, path: &FilePath, node: impl Node<'a>)
 					-> crate::Result<Arc<SymbolTable>> {
-	let mut table = SymbolTable::default();
-	for node in node.children() {
-		let span = node.span();
-		match node.kind() {
-			"module" => {
-				let name = node.identifier(scope)?;
-				if let Some((_, (TSpan(other), _))) = table.modules.get_key_value(&name) {
-					E::error().label(span.label()).label(other.other())
-						.message("duplicate module").emit(scope);
-				} else {
-					let module = ModuleLocation::Inline(inline_table(scope, path, node)?);
-					table.symbols.push(SymbolKey::Module(name.clone()));
-					table.modules.insert(name, (TSpan(span), module));
-				}
-			}
-			"use" => import(scope, &mut table, path, node)?,
-			"load" => load(scope, &mut table, node)?,
-			"function" => {
-				let name = node.identifier(scope)?;
-				let index = table.functions.get(&name).map(Vec::len).unwrap_or(0);
-				table.symbols.push(SymbolKey::Function(name.clone(), index));
-				table.functions.entry(name).or_default().push(TSpan(span));
-			}
-			"data" => {
-				let name = node.identifier(scope)?;
-				if let Some(TSpan(other)) = table.structures.get(&name) {
-					E::error().label(span.label()).label(other.other())
-						.message("duplicate structure").emit(scope);
-				} else {
-					table.symbols.push(SymbolKey::Structure(name.clone()));
-					table.structures.insert(name, TSpan(span));
-				}
-			}
-			"static" => {
-				let name = node.identifier(scope)?;
-				if let Some(TSpan(other)) = table.statics.get(&name) {
-					E::error().label(span.label()).label(other.other())
-						.message("duplicate static variable").emit(scope);
-				} else {
-					table.symbols.push(SymbolKey::Static(name.clone()));
-					table.statics.insert(name, TSpan(span));
-				}
-			}
-			"global_annotation" | "annotation" => (),
-			"identifier" => (), // Ignore module identifier.
-			_ => node.invalid(scope)?,
-		}
-	}
-
+	let span = TSpan(node.span());
+	let mut table = SymbolTable::new(span);
+	node.children().map(|node|
+		item(scope, path, &mut table, node)).last();
 	Ok(Arc::new(table))
+}
+
+fn item<'a>(scope: MScope, path: &FilePath, table: &mut SymbolTable,
+			node: impl Node<'a>) -> crate::Result<()> {
+	let span = node.span();
+	Ok(match node.kind() {
+		"module" => {
+			let name = node.identifier(scope)?;
+			if let Some((_, (other, _))) = table.modules.get_key_value(&name) {
+				E::error().label(span.label()).label(other.other())
+					.message("duplicate module").emit(scope);
+			} else {
+				let module = inline_table(scope, path, node)?;
+				let module = ModuleLocation::Inline(module);
+				table.symbols.push(SymbolKey::Module(name.clone()));
+				table.modules.insert(name, (span, module));
+			}
+		}
+		"use" => import(scope, table, path, node)?,
+		"load" => load(scope, table, node)?,
+		"function" => {
+			let name = node.identifier(scope)?;
+			let index = table.functions.get(&name).map(Vec::len).unwrap_or(0);
+			table.symbols.push(SymbolKey::Function(name.clone(), index));
+			table.functions.entry(name).or_default().push(TSpan(span));
+		}
+		"data" => {
+			let name = node.identifier(scope)?;
+			if let Some(TSpan(other)) = table.structures.get(&name) {
+				E::error().label(span.label()).label(other.other())
+					.message("duplicate structure").emit(scope);
+			} else {
+				table.structures.insert(name, TSpan(span));
+			}
+		}
+		"static" => {
+			let name = node.identifier(scope)?;
+			if let Some(TSpan(other)) = table.statics.get(&name) {
+				E::error().label(span.label()).label(other.other())
+					.message("duplicate static variable").emit(scope);
+			} else {
+				table.symbols.push(SymbolKey::Static(name.clone()));
+				table.statics.insert(name, TSpan(span));
+			}
+		}
+		"global_annotation" | "annotation" => (),
+		"identifier" => (), // Ignore module identifier.
+		_ => node.invalid(scope)?,
+	})
 }
 
 fn import<'a>(scope: MScope, table: &mut SymbolTable, path: &FilePath,
 			  node: impl Node<'a>) -> crate::Result<()> {
 	Ok(if let Some(other) = node.attribute("path") {
-		let path = path.join(other.text());
+		let range = 1..other.text().len() - 1;
+		let path = path.parent().unwrap().join(&other.text()[range]);
 		let name = node.attribute("name").as_ref().map(Node::text);
 		let stem = path.file_stem().and_then(|name| name.to_str());
 		let name = name.or(stem).ok_or_else(|| E::error()
@@ -165,13 +200,13 @@ fn import<'a>(scope: MScope, table: &mut SymbolTable, path: &FilePath,
 		if let Ok(name) = name {
 			let span = node.span();
 			let name = Identifier(name.into());
-			if let Some((_, (TSpan(other), _))) = table.modules.get_key_value(&name) {
+			if let Some((_, (other, _))) = table.modules.get_key_value(&name) {
 				E::error().label(span.label()).label(other.other())
 					.message("duplicate module").emit(scope);
 			} else {
 				let module = ModuleLocation::External(path);
 				table.symbols.push(SymbolKey::Module(name.clone()));
-				table.modules.insert(name, (TSpan(span), module));
+				table.modules.insert(name, (span, module));
 			}
 		}
 	})
@@ -183,12 +218,13 @@ fn import<'a>(scope: MScope, table: &mut SymbolTable, path: &FilePath,
 /// their source location.
 fn load<'a>(scope: MScope, table: &mut SymbolTable,
 			node: impl Node<'a>) -> crate::Result<()> {
+	let node = node.field(scope, "load")?;
 	let module = node.field(scope, "module")?;
-	let name = node.identifier(scope)?;
 	let span = node.span();
 	Ok(match module.kind() {
 		"string" => {
 			// TODO: implement C header loading
+			let name = node.identifier(scope)?;
 			if let Some(TSpan(other)) = table.libraries.get(&name) {
 				E::error().label(span.label()).label(other.other())
 					.message("duplicate library").emit(scope);
@@ -199,6 +235,7 @@ fn load<'a>(scope: MScope, table: &mut SymbolTable,
 		}
 		"path" => {
 			let node = node.field(scope, "as")?;
+			let name = node.identifier(scope)?;
 			match node.kind() {
 				"static" => {
 					if let Some(TSpan(other)) = table.statics.get(&name) {

@@ -57,17 +57,17 @@ module.exports = grammar({
             enclose($, $._item),
         ),
 
-        load: $ => seq(annotations($), 'load',
-            choice($._load_string, $._load_symbol), '\n'),
+        load: $ => seq(annotations($), 'load', field('load',
+            choice($.load_string, $.load_symbol)), '\n'),
 
-        _load_string: $ => seq(
+        load_string: $ => seq(
             field('module', $.string),
             'as', field('name', $.identifier),
             optional(seq('with', field('with', $.string))),
         ),
 
         _load_path: $ => repeat1(seq($.identifier, '.')),
-        _load_symbol: $ => seq(
+        load_symbol: $ => seq(
             field('module', alias($._load_path, $.path)),
             field('target', choice($.identifier, $.integral)),
             'as', field('as', choice(
@@ -82,10 +82,7 @@ module.exports = grammar({
 
         _use_path: $ => seq($.identifier,
             repeat(seq('.', $.identifier)),
-            optional(choice(
-                seq('.', alias('*', $.wildcard)),
-                seq('as', field('name', $._identifier)),
-            )),
+            optional(seq('.', alias('*', $.wildcard))),
         ),
 
         data: $ => seq(

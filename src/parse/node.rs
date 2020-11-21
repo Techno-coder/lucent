@@ -1,7 +1,7 @@
 use tree_sitter::TreeCursor;
 
 use crate::node::Identifier;
-use crate::query::{E, ISpan, MScope, S, Span};
+use crate::query::{E, ISpan, MScope, QueryError, S, Span};
 
 use super::{PSource, TSpan};
 
@@ -76,16 +76,16 @@ impl<'a> Node<'a> for TreeNode<'a> {
 	fn span(&self) -> Span {
 		Span::new(self.source.file, self.node.byte_range())
 	}
-	//
-	// fn field(&self, scope: MScope, field: &str) -> crate::Result<Self> {
-	// 	self.attribute(field).ok_or_else(||
-	// 		self.invalid::<()>(scope).unwrap_err())
-	// }
-	//
-	// fn invalid<T>(&self, scope: MScope) -> crate::Result<T> {
-	// 	E::error().message("syntax error")
-	// 		.label(self.span().label()).result(scope)
-	// }
+
+	fn field(&self, _: MScope, field: &str) -> crate::Result<Self> {
+		self.attribute(field).ok_or(QueryError::Failure)
+	}
+
+	fn invalid<T>(&self, _: MScope) -> crate::Result<T> {
+		// Syntax tree error nodes are processed during symbol
+		// table generation so no diagnostic is emitted here.
+		Err(QueryError::Failure)
+	}
 }
 
 pub struct TreeNodeChildren<'a> {

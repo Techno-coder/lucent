@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::FilePath;
 
 use super::{E, key, Key, Scope, Table};
@@ -11,8 +13,9 @@ use super::{E, key, Key, Scope, Table};
 #[derive(Debug, Default)]
 pub struct Context {
 	pub root: FilePath,
+	pub files: crate::source::FileCache,
 	pub compile: Table<key::Compile>,
-	pub source: crate::parse::Sources,
+	pub file_table: Table<key::FileTable>,
 	pub symbols: Table<key::Symbols>,
 	pub item_table: Table<key::ItemTable>,
 	pub functions: Table<key::Functions>,
@@ -29,15 +32,18 @@ impl Context {
 
 	pub fn errors(&self, scope: Scope) -> Vec<E> {
 		let mut errors = scope.errors;
-		scope.dependencies.iter().for_each(|key|
-			self.key_errors(&mut errors, key));
+		let visited = &mut HashSet::new();
+		scope.dependencies.into_iter().for_each(|key|
+			self.key_errors(visited, &mut errors, key));
 		errors
 	}
 
-	fn key_errors(&self, errors: &mut Vec<E>, key: &Key) {
-		let (other, dependencies) = match key {
+	fn key_errors(&self, visited: &mut HashSet<Key>,
+				  errors: &mut Vec<E>, key: Key) {
+		let (other, dependencies) = match &key {
+			Key::Read(key) => self.files.errors(key),
 			Key::Compile(key) => self.compile.errors(key),
-			Key::Source(key) => self.source.errors(key),
+			Key::FileTable(key) => self.file_table.errors(key),
 			Key::Symbols(key) => self.symbols.errors(key),
 			Key::ItemTable(key) => self.item_table.errors(key),
 			Key::Functions(key) => self.functions.errors(key),
@@ -47,15 +53,22 @@ impl Context {
 			Key::Module(key) => self.module.errors(key),
 		};
 
+		match visited.contains(&key) {
+			false => visited.insert(key),
+			true => return,
+		};
+
 		errors.extend(other.into_iter());
-		dependencies.iter().for_each(|key|
-			self.key_errors(errors, key));
+		dependencies.into_iter().for_each(|key|
+			self.key_errors(visited, errors, key));
 	}
 
-	fn key_invalidate(&self, key: &Key) -> Vec<Key> {
+	// TODO: recompute and compare for parse queries
+	pub fn invalidate(&self, key: &Key) {
 		match key {
+			Key::Read(key) => self.files.invalidate(key),
 			Key::Compile(key) => self.compile.invalidate(key),
-			Key::Source(key) => self.source.invalidate(key),
+			Key::FileTable(key) => self.file_table.invalidate(key),
 			Key::Symbols(key) => self.symbols.invalidate(key),
 			Key::ItemTable(key) => self.item_table.invalidate(key),
 			Key::Functions(key) => self.functions.invalidate(key),
@@ -63,6 +76,6 @@ impl Context {
 			Key::Structure(key) => self.structure.invalidate(key),
 			Key::Library(key) => self.library.invalidate(key),
 			Key::Module(key) => self.module.invalidate(key),
-		}
+		}.iter().for_each(|key| self.invalidate(key))
 	}
 }

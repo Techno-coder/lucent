@@ -1,10 +1,11 @@
-use codespan::FileId;
 use codespan_reporting::diagnostic;
+
+use crate::source::File;
 
 use super::{ESpan, MScope, QScope, QueryError, Span};
 
-type Diagnostic = diagnostic::Diagnostic<FileId>;
-type DiagnosticLabel = diagnostic::Label<FileId>;
+pub type Diagnostic = diagnostic::Diagnostic<File>;
+type DiagnosticLabel = diagnostic::Label<File>;
 
 /// An error with source locations.
 #[derive(Debug, Clone)]
@@ -84,7 +85,7 @@ impl Label {
 
 	pub fn lift(self, scope: QScope) -> Option<DiagnosticLabel> {
 		let Span(span) = self.span.lift(scope);
-		let (file, span) = span?;
+		let (file, span) = span.map(|(file, (start, end))| (file, start..end))?;
 		let label = DiagnosticLabel::new(self.style, file, span);
 		Some(label.with_message(self.message))
 	}

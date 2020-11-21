@@ -17,15 +17,36 @@ pub enum Universal<V, L> {
 	Load(L),
 }
 
-#[derive(Debug, Default)]
+/// Stores items contained within a module.
+/// Only child items within the same file are
+/// reachable from a given table.
+#[derive(Debug)]
 pub struct ItemTable {
-	pub(super) global_annotations: Vec<(Identifier, Span, HValue)>,
-	pub(super) modules: HashMap<Identifier, (Arc<HModule>, Arc<ItemTable>)>,
-	pub(super) functions: HashMap<Identifier, Arc<Vec<Arc<PFunction>>>>,
-	pub(super) structures: HashMap<Identifier, Arc<HData>>,
-	pub(super) statics: HashMap<Identifier, Arc<PStatic>>,
-	pub(super) libraries: HashMap<Identifier, Arc<HLibrary>>,
-	pub(super) roots: Vec<(Identifier, FIndex)>,
+	pub module: Arc<HModule>,
+	pub modules: HashMap<Identifier, Arc<ItemTable>>,
+	pub functions: HashMap<Identifier, Arc<Vec<Arc<PFunction>>>>,
+	pub structures: HashMap<Identifier, Arc<HData>>,
+	pub statics: HashMap<Identifier, Arc<PStatic>>,
+	pub libraries: HashMap<Identifier, Arc<HLibrary>>,
+	pub global_annotations: Vec<(Identifier, Span, HValue)>,
+	pub roots: Vec<(Identifier, FIndex)>,
+	pub inclusions: Arc<Inclusions>,
+}
+
+impl ItemTable {
+	pub fn new(inclusions: Inclusions) -> Self {
+		Self {
+			module: Arc::new(HModule::default()),
+			modules: HashMap::new(),
+			functions: HashMap::new(),
+			structures: HashMap::new(),
+			statics: HashMap::new(),
+			libraries: HashMap::new(),
+			global_annotations: vec![],
+			inclusions: Arc::new(inclusions),
+			roots: vec![],
+		}
+	}
 }
 
 pub fn function(scope: QScope, FPath(path, index): &FPath) -> crate::Result<Arc<PFunction>> {
@@ -46,16 +67,8 @@ pub fn functions(scope: QScope, path: &Path) -> crate::Result<Arc<Vec<Arc<PFunct
 }
 
 pub fn module(scope: QScope, path: &Path) -> crate::Result<Arc<HModule>> {
-	scope.ctx.module.inherit(scope, path.clone(), |scope| match path {
-		Path::Root => panic!("invalid module path: {}", path),
-		Path::Node(module, identifier) => {
-			let modules = &item_table(scope, module)?.modules;
-			let module = modules.get(identifier).map(|(module, _)| module);
-			module.cloned().ok_or_else(|| E::error()
-				.message(format!("undefined module: {}", path))
-				.label(scope.span.label()).to(scope))
-		}
-	})
+	scope.ctx.module.inherit(scope, path.clone(),
+		|scope| Ok(item_table(scope, path)?.module.clone()))
 }
 
 pub fn statics(scope: QScope, path: &Path) -> crate::Result<Arc<PStatic>> {
@@ -94,26 +107,27 @@ pub fn structure(scope: QScope, path: &Path) -> crate::Result<Arc<HData>> {
 	})
 }
 
-fn item_table(scope: QScope, path: &Path) -> crate::Result<Arc<ItemTable>> {
-	let inclusions = Inclusions::new(path.clone());
+pub fn item_table(scope: QScope, path: &Path) -> crate::Result<Arc<ItemTable>> {
+	let inclusions = Inclusions::root(Arc::new(path.clone()));
 	scope.ctx.item_table.inherit(scope, path.clone(), |scope| match path {
 		Path::Root => {
 			let symbols = super::symbols(scope, path)?;
 			super::file_table(scope, &symbols, inclusions, &scope.ctx.root)
 		}
-		Path::Node(parent, module) => {
+		Path::Node(parent, name) => {
 			let symbols = super::symbols(scope, parent)?;
-			let (_, location) = symbols.modules.get(module).ok_or_else(||
+			let (_, location) = symbols.modules.get(name).ok_or_else(||
 				E::error().message(format!("undefined module: {}", path))
 					.label(scope.span.label()).to(scope))?;
 
 			match location {
-				ModuleLocation::External(path) =>
-					super::file_table(scope, &symbols, inclusions, path),
+				ModuleLocation::External(file) => {
+					let symbols = super::symbols(scope, path)?;
+					super::file_table(scope, &symbols, inclusions, file)
+				}
 				ModuleLocation::Inline(_) => {
 					let table = item_table(scope, parent)?;
-					let (_, table) = &table.modules[module];
-					Ok(table.clone())
+					Ok(table.modules[name].clone())
 				}
 			}
 		}
