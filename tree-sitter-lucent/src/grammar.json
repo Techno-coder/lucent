@@ -12,12 +12,17 @@
             "name": "_item"
           },
           {
-            "type": "FIELD",
-            "name": "annotation",
+            "type": "ALIAS",
             "content": {
               "type": "SYMBOL",
-              "name": "global_annotation"
-            }
+              "name": "inline_annotation"
+            },
+            "named": true,
+            "value": "annotation"
+          },
+          {
+            "type": "SYMBOL",
+            "name": "global_annotation"
           }
         ]
       }
@@ -51,6 +56,31 @@
         }
       ]
     },
+    "annotation": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "STRING",
+          "value": "@"
+        },
+        {
+          "type": "FIELD",
+          "name": "name",
+          "content": {
+            "type": "SYMBOL",
+            "name": "identifier"
+          }
+        },
+        {
+          "type": "FIELD",
+          "name": "value",
+          "content": {
+            "type": "SYMBOL",
+            "name": "_value"
+          }
+        }
+      ]
+    },
     "global_annotation": {
       "type": "SEQ",
       "members": [
@@ -76,12 +106,12 @@
         }
       ]
     },
-    "annotation": {
+    "inline_annotation": {
       "type": "SEQ",
       "members": [
         {
           "type": "STRING",
-          "value": "@"
+          "value": "@!"
         },
         {
           "type": "FIELD",
@@ -2489,7 +2519,7 @@
       "type": "PATTERN",
       "value": "[^\\x00-@\\[-^`{-~][^\\x00-&(-/:-@\\[-^`{-~]*"
     },
-    "_comment": {
+    "comment": {
       "type": "TOKEN",
       "content": {
         "type": "SEQ",
@@ -2509,7 +2539,7 @@
   "extras": [
     {
       "type": "SYMBOL",
-      "name": "_comment"
+      "name": "comment"
     },
     {
       "type": "PATTERN",

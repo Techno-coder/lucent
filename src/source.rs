@@ -34,6 +34,7 @@ impl Source {
 	}
 }
 
+// TODO: consider possible race conditions
 #[derive(Debug, Default)]
 pub struct FileCache {
 	table: Table<key::Read>,

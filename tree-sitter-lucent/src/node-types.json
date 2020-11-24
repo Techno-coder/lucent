@@ -3233,28 +3233,25 @@
   {
     "type": "source",
     "named": true,
-    "fields": {
-      "annotation": {
-        "multiple": true,
-        "required": false,
-        "types": [
-          {
-            "type": "global_annotation",
-            "named": true
-          }
-        ]
-      }
-    },
+    "fields": {},
     "children": {
       "multiple": true,
       "required": false,
       "types": [
+        {
+          "type": "annotation",
+          "named": true
+        },
         {
           "type": "data",
           "named": true
         },
         {
           "type": "function",
+          "named": true
+        },
+        {
+          "type": "global_annotation",
           "named": true
         },
         {
@@ -3934,6 +3931,10 @@
   },
   {
     "type": "@",
+    "named": false
+  },
+  {
+    "type": "@!",
     "named": false
   },
   {

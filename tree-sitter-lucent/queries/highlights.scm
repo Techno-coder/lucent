@@ -1,12 +1,20 @@
+; Defines a base highlight for source code.
+; The contents of this file is coupled to the
+; language server semantic tokens query and
+; should not be used on its own.
+
 "module" @keyword
 "when" @keyword
+"if" @keyword
 "fn" @keyword
+"let" @keyword
 "new" @keyword
 "data" @keyword
 "static" @keyword
 "inline" @keyword
 "return" @keyword
 "while" @keyword
+"load" @keyword
 "with" @keyword
 "use" @keyword
 "as" @keyword
@@ -32,6 +40,7 @@
 "/" @operator
 "%" @operator
 
+"=" @operator
 ("+" "=") @operator
 ("-" "=") @operator
 ("*" "=") @operator
@@ -43,26 +52,39 @@
 ("<<" "=") @operator
 (">>" "=") @operator
 
-"." @delimiter
-"," @delimiter
-":" @delimiter
-";" @delimiter
-"(" @bracket
-")" @bracket
+"." @punctuation.delimiter
+"," @punctuation.delimiter
+":" @punctuation.delimiter
+";" @punctuation.delimiter
+"(" @punctuation.bracket
+")" @punctuation.bracket
+"[" @punctuation.bracket
+"]" @punctuation.bracket
 
 (string) @string
 (integral) @number
-(register) @number
-(rune) @number
-"true" @number
-"false" @number
+(register) @constant
+(rune) @constant
+"true" @constant
+"false" @constant
 
-(annotation "@" @property
-	name: (identifier) @property)
+(data name: (identifier) @type)
+(static name: (identifier) @global)
+(module name: (identifier) @module)
+(load_string name: (identifier) @module)
+(function name: (identifier) @function)
+(signature name: (identifier) @function)
+(variable name: (identifier) @variable)
+(let name: (identifier) @variable)
 
-(global_annotation "@@" @property
-	name: (identifier) @property)
+(annotation "@" @attribute
+	name: (identifier) @attribute)
+(annotation "@!" @attribute
+	name: (identifier) @attribute)
+(global_annotation "@@" @attribute
+	name: (identifier) @attribute)
 
 (root) @keyword
 (break) @keyword
-(identifier) @variable
+(continue) @keyword
+(comment) @comment

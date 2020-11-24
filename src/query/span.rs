@@ -31,11 +31,12 @@ impl Span {
 	}
 
 	pub fn offset(Self(span): Self, Self(relative): Self) -> ISpan {
-		let ((_, (base, _)), (_, (start, end))) = Option::zip(span, relative)
-			.expect("cannot take offset on internal spans");
-		let start = start as isize - base as isize;
-		let end = end as isize - base as isize;
-		ISpan(Some((start, end)))
+		let (_, (base, _)) = span.expect("cannot offset on internal span");
+		ISpan(relative.map(|(_, (start, end))| {
+			let start = start as isize - base as isize;
+			let end = end as isize - base as isize;
+			(start, end)
+		}))
 	}
 
 	pub fn lift(Self(span): Self, ISpan(relative): ISpan) -> Self {

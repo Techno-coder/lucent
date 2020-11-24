@@ -23,7 +23,7 @@ pub struct SymbolTable {
 	/// in this module. Used for order dependent operations
 	/// such as code generation.
 	pub symbols: Vec<SymbolKey>,
-	pub modules: HashMap<Identifier, (Span, ModuleLocation)>,
+	pub modules: HashMap<Identifier, (TSpan, ModuleLocation)>,
 	/// Contains a list of locations for
 	/// functions with the same name.
 	pub functions: HashMap<Identifier, Vec<TSpan>>,
@@ -143,14 +143,14 @@ fn item<'a>(scope: MScope, path: &FilePath, table: &mut SymbolTable,
 	Ok(match node.kind() {
 		"module" => {
 			let name = node.identifier(scope)?;
-			if let Some((_, (other, _))) = table.modules.get_key_value(&name) {
+			if let Some((TSpan(other), _)) = table.modules.get(&name) {
 				E::error().label(span.label()).label(other.other())
 					.message("duplicate module").emit(scope);
 			} else {
 				let module = inline_table(scope, path, node)?;
 				let module = ModuleLocation::Inline(module);
 				table.symbols.push(SymbolKey::Module(name.clone()));
-				table.modules.insert(name, (span, module));
+				table.modules.insert(name, (TSpan(span), module));
 			}
 		}
 		"use" => import(scope, table, path, node)?,
@@ -200,13 +200,13 @@ fn import<'a>(scope: MScope, table: &mut SymbolTable, path: &FilePath,
 		if let Ok(name) = name {
 			let span = node.span();
 			let name = Identifier(name.into());
-			if let Some((_, (other, _))) = table.modules.get_key_value(&name) {
+			if let Some((TSpan(other), _)) = table.modules.get(&name) {
 				E::error().label(span.label()).label(other.other())
 					.message("duplicate module").emit(scope);
 			} else {
 				let module = ModuleLocation::External(path);
 				table.symbols.push(SymbolKey::Module(name.clone()));
-				table.modules.insert(name, (span, module));
+				table.modules.insert(name, (TSpan(span), module));
 			}
 		}
 	})

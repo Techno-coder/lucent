@@ -13,8 +13,9 @@ pub type HFields = HashMap<Identifier, (ISpan, HIndex)>;
 pub type HIndex = VIndex<HNode>;
 pub type HValue = Value<HNode>;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct HModule {
+	pub span: ISpan,
 	pub annotations: HAnnotations,
 }
 

@@ -15,6 +15,9 @@ pub fn server() -> crate::GenericResult {
 	let kind = lsp_types::TextDocumentSyncKind::Full;
 	let kind = lsp_types::TextDocumentSyncCapability::Kind(kind);
 	capabilities.text_document_sync = Some(kind);
+
+	let semantic = super::semantic_tokens_options().into();
+	capabilities.semantic_tokens_provider = Some(semantic);
 	capabilities.definition_provider = Some(true);
 
 	let capabilities = serde_json::to_value(&capabilities).unwrap();
@@ -39,7 +42,9 @@ fn serve(connection: &Connection, parameters: serde_json::Value) -> crate::Gener
 			Message::Request(packet) => {
 				if connection.handle_shutdown(&packet)? { return Ok(()); }
 				RequestDispatch::new(scene, packet)
-					.on::<GotoDefinition, _>(super::definition);
+					.on::<GotoDefinition, _>(super::definition)
+					.on::<SemanticTokensRequest, _>(super::semantic_tokens)
+					.finish();
 			}
 			Message::Response(_response) => (),
 			Message::Notification(packet) => Dispatch::new(scene, packet)

@@ -142,8 +142,8 @@ fn valued<'a>(scene: &mut Scene, scope: MScope, inclusions: &Inclusions,
 				match fields.get(&name) {
 					None => fields.insert(name, (span, value)).unwrap_none(),
 					Some((other, _)) => E::error().message("duplicate field")
-						.label(TSpan::lift(base, *other).label())
-						.label(TSpan::lift(base, span).other())
+						.label(TSpan::lift(base, *other).other())
+						.label(TSpan::lift(base, span).label())
 						.emit(scope),
 				}
 			}

@@ -314,8 +314,11 @@ These variants can be destructured with a `match` expression.
 @annotation.1 parameter
 item
 ```
-Annotations affect the subsequent item.
-Global annotations affect the entire compilation unit and can only be declared in the root file.
+Annotations affect the subsequent item. Inline annotations affect the enclosing module and may only be declared at the root scope of a file:
+```
+@!annotation parameter
+```
+ Global annotations affect the entire compilation unit and may only be declared at the root scope of a file:
 ```
 @@annotation parameter
 ```

@@ -9,7 +9,7 @@ fn function() // truth
 ---
 
 (source (function (identifier)
-	(block (truth))))
+	(block (comment) (comment) (truth))))
 
 =====================================
 Functions
@@ -157,13 +157,15 @@ module Module
 	static variable: truth
 
 @@annotation parameter
+@!annotation parameter
 
 ---
 
 (source
 	(module (annotation (identifier) (path (identifier)))
 		(identifier) (static (identifier) (path (identifier))))
-	(global_annotation (identifier) (path (identifier))))
+	(global_annotation (identifier) (path (identifier)))
+	(annotation (identifier) (path (identifier))))
 
 =====================================
 Imports

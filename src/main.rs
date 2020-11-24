@@ -1,5 +1,6 @@
 #![feature(option_unwrap_none)]
 #![feature(bool_to_option)]
+#![feature(once_cell)]
 
 mod node;
 // mod lower;

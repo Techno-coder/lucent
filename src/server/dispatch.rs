@@ -10,6 +10,7 @@ impl<'a, 'b> RequestDispatch<'a, 'b> {
 		Self(scene, Some(value))
 	}
 
+	#[must_use]
 	pub fn on<R: request::Request, F>(self, function: F) -> Self where
 		F: FnOnce(MScene<'a, '_>, R::Params) -> crate::Result<R::Result> {
 		match self {
@@ -30,6 +31,8 @@ impl<'a, 'b> RequestDispatch<'a, 'b> {
 			}
 		}
 	}
+
+	pub fn finish(self) {}
 }
 
 pub struct Dispatch<'a, 'b, T>(MScene<'a, 'b>, Option<T>);

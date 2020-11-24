@@ -21,12 +21,15 @@ export function activate(_context: ExtensionContext) {
         synchronize: {fileEvents: workspace.createFileSystemWatcher('**/*.lc')}
     };
 
-    (client = new LanguageClient(
+    let client = new LanguageClient(
         'lucent-server',
         'Lucent Language Server',
         serverOptions,
-        clientOptions
-    )).start();
+        clientOptions,
+    );
+
+    client.registerProposedFeatures();
+    client.start();
 }
 
 export function deactivate(): Thenable<void> | undefined {

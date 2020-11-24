@@ -36,16 +36,20 @@ impl Inclusions {
 
 	pub fn wildcard(self: &mut Arc<Self>, scope: QScope,
 					path: HPath) -> crate::Result<()> {
+		crate::parse::symbols(scope, &path.path())?;
 		Ok(self.modify(scope)?.wildcard.push(path))
 	}
 
 	pub fn specific(self: &mut Arc<Self>, scope: QScope,
 					base: &TSpan, target: HPath) -> crate::Result<()> {
 		let name = match &target {
-			HPath::Node(_, name) => name.clone(),
 			HPath::Root(_) => return E::error()
 				.message("cannot import empty path")
 				.label(scope.span.label()).result(scope),
+			HPath::Node(module, name) => {
+				crate::parse::symbols(scope, &module.path())?;
+				name.clone()
+			}
 		};
 
 		let inclusions = self.modify(scope)?;

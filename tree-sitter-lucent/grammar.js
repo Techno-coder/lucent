@@ -17,7 +17,7 @@ module.exports = grammar({
     name: 'lucent',
 
     extras: $ => [
-        $._comment,
+        $.comment,
         /\s/,
     ],
 
@@ -31,7 +31,8 @@ module.exports = grammar({
 
     rules: {
         source: $ => repeat(choice($._item,
-            field('annotation', $.global_annotation))),
+            alias($.inline_annotation, $.annotation),
+            $.global_annotation)),
 
         _item: $ => choice(
             $.module,
@@ -42,15 +43,9 @@ module.exports = grammar({
             $.use,
         ),
 
-        global_annotation: $ => seq('@@',
-            field('name', $.identifier),
-            field('value', $._value),
-        ),
-
-        annotation: $ => seq('@',
-            field('name', $.identifier),
-            field('value', $._value),
-        ),
+        annotation: $ => annotation($, '@'),
+        global_annotation: $ => annotation($, '@@'),
+        inline_annotation: $ => annotation($, '@!'),
 
         module: $ => seq(annotations($), 'module',
             field('name', $.identifier),
@@ -286,9 +281,16 @@ module.exports = grammar({
 
         identifier: $ => $._identifier,
         _identifier: _ => /[^\x00-@\[-^`{-~][^\x00-&(-/:-@\[-^`{-~]*/,
-        _comment: _ => token(seq('//', /[^\n]*/)),
+        comment: _ => token(seq('//', /[^\n]*/)),
     }
 });
+
+function annotation($, prefix) {
+    return seq(prefix,
+        field('name', $.identifier),
+        field('value', $._value),
+    );
+}
 
 function annotations($) {
     return repeat($.annotation);

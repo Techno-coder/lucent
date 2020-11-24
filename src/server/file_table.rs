@@ -29,14 +29,13 @@ impl FileTable {
 /// context must be in its canonical form.
 pub fn file_module(scope: QScope, file: &FilePath)
 				   -> crate::Result<Arc<Path>> {
-	match file == &scope.ctx.root {
-		true => Ok(Arc::new(Path::Root)),
-		false => {
-			let path = file_table(scope)?.find(file);
-			path.ok_or_else(|| E::error()
-				.message("file absent from module tree")
-				.label(scope.span.label()).to(scope))
-		}
+	if file == &scope.ctx.root {
+		Ok(Arc::new(Path::Root))
+	} else {
+		let path = file_table(scope)?.find(file);
+		path.ok_or_else(|| E::error()
+			.message("file absent from module tree")
+			.label(scope.span.label()).to(scope))
 	}
 }
 

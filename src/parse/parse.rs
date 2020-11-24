@@ -10,18 +10,20 @@ use crate::source::{File, Source};
 
 use super::*;
 
-extern { fn tree_sitter_lucent() -> Language; }
+pub fn language() -> Language {
+	extern { fn tree_sitter_lucent() -> Language; }
+	unsafe { tree_sitter_lucent() }
+}
 
 pub fn parser() -> Parser {
 	let mut parser = Parser::new();
-	let language = unsafe { tree_sitter_lucent() };
-	parser.set_language(language).unwrap();
+	parser.set_language(language()).unwrap();
 	parser
 }
 
 pub fn errors() -> Query {
-	let language = unsafe { tree_sitter_lucent() };
-	Query::new(language, "(ERROR) @error").unwrap()
+	let query = "(ERROR) @error";
+	Query::new(language(), query).unwrap()
 }
 
 /// Contains references to `Source` instances.
@@ -51,9 +53,11 @@ pub fn file_table(scope: QScope, symbols: &SymbolTable, inclusions: Inclusions,
 
 pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: Inclusions,
 					   node: impl Node<'a>) -> Arc<ItemTable> {
-	let mut table = ItemTable::new(inclusions);
-	node.children().map(|node|
-		item(scope, symbols, &mut table, node)).last();
+	let span = TSpan::offset(&symbols.span, node.span());
+	let module = HModule { span, annotations: HAnnotations::new() };
+	let mut table = ItemTable::new(module, inclusions);
+	let item = |node| item(scope, symbols, &mut table, node);
+	node.children().map(item).last();
 	Arc::new(table)
 }
 

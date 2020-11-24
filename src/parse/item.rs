@@ -34,9 +34,10 @@ pub struct ItemTable {
 }
 
 impl ItemTable {
-	pub fn new(inclusions: Inclusions) -> Self {
+	pub fn new(module: HModule,
+			   inclusions: Inclusions) -> Self {
 		Self {
-			module: Arc::new(HModule::default()),
+			module: Arc::new(module),
 			modules: HashMap::new(),
 			functions: HashMap::new(),
 			structures: HashMap::new(),

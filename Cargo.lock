@@ -297,6 +297,7 @@ dependencies = [
  "parking_lot",
  "serde_json",
  "tree-sitter",
+ "tree-sitter-highlight",
 ]
 
 [[package]]
@@ -522,6 +523,16 @@ checksum = "d18dcb776d3affaba6db04d11d645946d34a69b3172e588af96ce9fecd20faac"
 dependencies = [
  "cc",
  "regex",
+]
+
+[[package]]
+name = "tree-sitter-highlight"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "856e1c23cdd0ee2a2d7f1c7d5ad2531911a71b907eca0f51629ca5feaaf735d1"
+dependencies = [
+ "regex",
+ "tree-sitter",
 ]
 
 [[package]]

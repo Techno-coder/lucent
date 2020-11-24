@@ -30,10 +30,10 @@ module Loader
                 no_multiboot(0)
 
         fn no_multiboot(code: u8) never
-            *(0xb8000 as *u32) = 0x4f524f45 
-            *(0xb8004 as *u32) = 0x4f3a4f52 
-            *(0xb8008 as *u32) = 0x4f204f20 
-            *(0xb800a as *u32) = code
+            0xb8000 as *u32! = 0x4f524f45 
+            0xb8004 as *u32! = 0x4f3a4f52 
+            0xb8008 as *u32! = 0x4f204f20 
+            0xb800a as *u32! = code
             inline x86.halt()       
 
     static STACK: [u8; 64 * 1024]
