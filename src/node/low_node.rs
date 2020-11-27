@@ -2,8 +2,6 @@ use crate::query::S;
 
 use super::*;
 
-pub type LValue = Value<LNode>;
-pub type LIndex = VIndex<LNode>;
 pub type LReceiver = Receiver<LIndex>;
 
 /// A lower variant of `HNode` that is

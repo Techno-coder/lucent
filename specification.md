@@ -318,7 +318,7 @@ Annotations affect the subsequent item. Inline annotations affect the enclosing 
 ```
 @!annotation parameter
 ```
- Global annotations affect the entire compilation unit and may only be declared at the root scope of a file:
+ Global annotations affect the entire compilation unit and may only be declared at the root scope of the root file:
 ```
 @@annotation parameter
 ```

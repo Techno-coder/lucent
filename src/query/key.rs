@@ -50,12 +50,13 @@ macro_rules! queries {
 }
 
 queries! {
-	Compile() -> ();
+	Compile(()) -> ();
 	Read(FilePath) -> crate::source::File;
 	FileTable(FilePath) -> crate::server::FileTable;
 	Symbols(Path) -> crate::parse::SymbolTable;
 
 	ItemTable(Path) -> crate::parse::ItemTable;
+	GlobalAnnotations(()) -> crate::node::GlobalAnnotations;
 	Functions(Path) -> Vec<Arc<crate::parse::PFunction>>;
 	Static(Path) -> crate::parse::PStatic;
 	Structure(Path) -> crate::node::HData;

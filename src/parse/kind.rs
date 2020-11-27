@@ -1,39 +1,39 @@
 use crate::node::{HPath, HType, Identifier, Sign, Width};
 use crate::query::{E, MScope, S};
 
-use super::{Inclusions, Node, TSpan};
+use super::{Node, Scene, TSpan};
 
 /// Parses a type.
-pub fn kind<'a>(scope: MScope, inclusions: &Inclusions, span: &TSpan,
+pub fn kind<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 				node: impl Node<'a>) -> crate::Result<S<HType>> {
 	Ok(S::new(match node.kind() {
 		"signature_type" => {
-			let signature = super::signature(scope, inclusions, span, &node)?;
+			let signature = super::signature(scope, scene, span, &node)?;
 			HType::Function(Box::new(signature))
 		}
 		"array_type" => {
 			let kind = node.field(scope, "type")?;
 			let size = node.field(scope, "size")?;
-			let kind = self::kind(scope, inclusions, span, kind)?;
-			let size = super::value(scope, inclusions, span, size);
+			let kind = self::kind(scope, scene, span, kind)?;
+			let size = super::value(scope, scene, span, size);
 			HType::Array(Box::new(kind), size)
 		}
 		"slice_type" => {
 			let kind = node.field(scope, "type")?;
-			let kind = self::kind(scope, inclusions, span, kind)?;
+			let kind = self::kind(scope, scene, span, kind)?;
 			HType::Slice(Box::new(kind))
 		}
 		"pointer" => {
 			let kind = node.field(scope, "type")?;
-			let kind = self::kind(scope, inclusions, span, kind)?;
+			let kind = self::kind(scope, scene, span, kind)?;
 			HType::Pointer(Box::new(kind))
 		}
-		"path" => path_kind(scope, inclusions, span, &node)?,
+		"path" => path_kind(scope, scene, span, &node)?,
 		_ => node.invalid(scope)?,
 	}, TSpan::offset(span, node.span())))
 }
 
-fn path_kind<'a>(scope: MScope, inclusions: &Inclusions, base: &TSpan,
+fn path_kind<'a>(scope: MScope, scene: &Scene, base: &TSpan,
 				 node: &impl Node<'a>) -> crate::Result<HType> {
 	let path = super::path(scope, base, node)?;
 	if let HPath::Node(module, name) = &path {
@@ -58,7 +58,7 @@ fn path_kind<'a>(scope: MScope, inclusions: &Inclusions, base: &TSpan,
 	}
 
 	let scope = &mut scope.span(node.span());
-	let path = inclusions.structure(scope, base, &path)?
+	let path = scene.inclusions.structure(scope, base, &path)?
 		.ok_or_else(|| E::error().message("undefined type")
 			.label(scope.span.label()).to(scope))?;
 	Ok(HType::Structure(path))

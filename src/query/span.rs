@@ -3,7 +3,7 @@ use std::ops::Range;
 
 use codespan_reporting::diagnostic;
 
-use crate::node::{FPath, Path, Symbol};
+use crate::node::{FPath, Identifier, Path, Symbol};
 use crate::parse::TSpan;
 use crate::source::File;
 
@@ -86,24 +86,38 @@ impl ESpan {
 		match self {
 			ESpan::Span(span) => span,
 			ESpan::Item(symbol, span) => {
+				if let Symbol::Global(name) = symbol {
+					let table = crate::parse::global_annotations(scope).ok();
+					let annotation = table.as_ref().and_then(|table| table.get(&name));
+					let span = annotation.map(|annotation| annotation.span);
+					return span.unwrap_or_else(|| Span::internal());
+				}
+
 				let module = match &symbol {
-					Symbol::Module(path) => path,
-					Symbol::Function(FPath(Path::Node(parent, _), _)) => parent,
-					Symbol::Structure(Path::Node(parent, _)) => parent,
-					Symbol::Static(Path::Node(parent, _)) => parent,
-					Symbol::Library(Path::Node(parent, _)) => parent,
-					other => panic!("invalid symbol: {:?}", other),
-				};
+					Symbol::Global(_) => unreachable!(),
+					Symbol::Module(path) => Some(path),
+					Symbol::Function(FPath(path, _)) => path.parent(),
+					Symbol::Structure(path) => path.parent(),
+					Symbol::Static(path) => path.parent(),
+					Symbol::Library(path) => path.parent(),
+				}.unwrap_or_else(|| panic!("invalid symbol: {:?}", symbol));
+
+				fn name(path: &Path) -> &Identifier {
+					match path {
+						Path::Node(_, name) => name,
+						Path::Root => panic!("invalid symbol: {:?}", path),
+					}
+				}
 
 				let table = crate::parse::symbols(scope, module);
 				table.map(|table| TSpan::lift(match &symbol {
+					Symbol::Global(_) => unreachable!(),
 					Symbol::Module(_) => &table.span,
-					Symbol::Function(FPath(Path::Node(_, name), index)) =>
-						&table.functions[name][*index],
-					Symbol::Structure(Path::Node(_, name)) => &table.structures[name],
-					Symbol::Static(Path::Node(_, name)) => &table.statics[name],
-					Symbol::Library(Path::Node(_, name)) => &table.libraries[name],
-					other => panic!("invalid symbol: {:?}", other),
+					Symbol::Function(FPath(path, index)) =>
+						&table.functions[name(path)][*index],
+					Symbol::Structure(path) => &table.structures[name(path)],
+					Symbol::Static(path) => &table.statics[name(path)],
+					Symbol::Library(path) => &table.libraries[name(path)],
 				}, span)).unwrap_or_else(|_| Span::internal())
 			}
 		}

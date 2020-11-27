@@ -1,11 +1,12 @@
 use std::lazy::SyncLazy;
+use std::sync::Arc;
 
 use codespan_lsp::byte_index_to_position as position;
 use lsp_types::*;
 use tree_sitter_highlight::{Highlight, Highlighter, HighlightEvent};
 use tree_sitter_highlight::HighlightConfiguration as Configuration;
 
-use crate::node::{HPath, HType, HValue, HVariables, Identifier, Path, Variable};
+use crate::node::{HPath, HType, HVariables, Identifier, Path, Value, Variable};
 use crate::parse::TSpan;
 use crate::query::{ISpan, QScope, S, Span};
 
@@ -149,12 +150,12 @@ impl<'a> ReferenceVisitor<'a> for Tokens<'a> {
 		}
 	}
 
-	fn variable(&mut self, base: &TSpan, _: &HValue,
+	fn variable(&mut self, base: &TSpan, _: &Value,
 				_: Option<&HVariables>, _: &Variable, span: &ISpan) {
 		self.token(base, span, Token::Variable);
 	}
 
-	fn field(&mut self, base: &TSpan, structure: &Path,
+	fn field(&mut self, base: &TSpan, structure: &Arc<Path>,
 			 name: &Identifier, span: &ISpan) {
 		let data = crate::parse::structure(self.scope, structure);
 		if data.unwrap().fields.contains_key(name) {

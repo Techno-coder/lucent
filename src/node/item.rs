@@ -23,16 +23,18 @@ impl fmt::Display for Identifier {
 
 /// Identifies a function by their path and overload index.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
-pub struct FPath(pub Path, pub FIndex);
+pub struct FPath(pub Arc<Path>, pub FIndex);
 
 /// Uniquely references an item.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Symbol {
-	Module(Path),
+	Module(Arc<Path>),
+	Library(Arc<Path>),
+	Static(Arc<Path>),
 	Function(FPath),
-	Structure(Path),
-	Static(Path),
-	Library(Path),
+	Structure(Arc<Path>),
+	/// Global annotation.
+	Global(Identifier),
 }
 
 /// Represents a variable that may be shadowed.

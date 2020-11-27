@@ -3,32 +3,34 @@ use std::collections::HashMap;
 use indexmap::IndexMap;
 
 use crate::FilePath;
-use crate::query::{ISpan, S};
+use crate::query::{ISpan, S, Span};
 
 use super::*;
 
-pub type HAnnotations = HashMap<Identifier, (ISpan, HValue)>;
+pub type GlobalAnnotations = HashMap<Identifier, HGlobalAnnotation>;
+pub type HAnnotations = HashMap<Identifier, (ISpan, VIndex)>;
 pub type HVariables = IndexMap<Identifier, (ISpan, S<HType>)>;
 pub type HFields = HashMap<Identifier, (ISpan, HIndex)>;
-pub type HIndex = VIndex<HNode>;
-pub type HValue = Value<HNode>;
 
 #[derive(Debug)]
 pub struct HModule {
-	pub span: ISpan,
+	pub values: VStore,
 	pub annotations: HAnnotations,
+	pub span: ISpan,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct HStatic {
+	pub values: VStore,
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
 	pub kind: Option<S<HType>>,
-	pub value: Option<HValue>,
+	pub value: Option<VIndex>,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct HData {
+	pub values: VStore,
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
 	pub fields: HVariables,
@@ -36,10 +38,11 @@ pub struct HData {
 
 #[derive(Debug, PartialEq)]
 pub struct HFunction {
+	pub values: VStore,
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
 	pub signature: HSignature,
-	pub value: HValue,
+	pub value: VIndex,
 }
 
 #[derive(Debug, PartialEq)]
@@ -51,6 +54,7 @@ pub struct HSignature {
 
 #[derive(Debug, PartialEq)]
 pub struct HLibrary {
+	pub values: VStore,
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
 	pub path: FilePath,
@@ -58,6 +62,7 @@ pub struct HLibrary {
 
 #[derive(Debug, PartialEq)]
 pub struct HLoadFunction {
+	pub values: VStore,
 	pub library: HPath,
 	pub reference: LoadReference,
 	pub annotations: HAnnotations,
@@ -67,11 +72,19 @@ pub struct HLoadFunction {
 
 #[derive(Debug, PartialEq)]
 pub struct HLoadStatic {
+	pub values: VStore,
 	pub library: HPath,
 	pub reference: LoadReference,
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
 	pub kind: S<HType>,
+}
+
+#[derive(Debug, PartialEq)]
+pub struct HGlobalAnnotation {
+	pub values: VStore,
+	pub value: VIndex,
+	pub span: Span,
 }
 
 /// A high level abstract syntax tree node that
@@ -87,8 +100,8 @@ pub enum HNode {
 	When(Vec<(HIndex, HIndex)>),
 	Cast(HIndex, Option<S<HType>>),
 	Return(Option<HIndex>),
-	Compile(HValue),
-	Inline(HValue),
+	Compile(VIndex),
+	Inline(VIndex),
 	Call(HPath, Vec<HIndex>),
 	Method(HIndex, Vec<HIndex>),
 	Field(HIndex, S<Identifier>),
@@ -185,6 +198,6 @@ pub enum HType {
 	Integral(Sign, Width),
 	Pointer(Box<S<HType>>),
 	Function(Box<HSignature>),
-	Array(Box<S<HType>>, HValue),
+	Array(Box<S<HType>>, VIndex),
 	Slice(Box<S<HType>>),
 }

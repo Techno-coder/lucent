@@ -4,9 +4,9 @@ use std::sync::Arc;
 use indexmap::IndexMap;
 
 use crate::node::*;
-use crate::query::{E, MScope, QScope, S, Span};
+use crate::query::{E, MScope, QScope, S};
 
-use super::{Inclusions, ModuleLocation, Node, TSpan};
+use super::{Inclusions, ModuleLocation, Node, Scene, TSpan};
 
 pub type PFunction = Universal<HFunction, HLoadFunction>;
 pub type PStatic = Universal<HStatic, HLoadStatic>;
@@ -28,7 +28,6 @@ pub struct ItemTable {
 	pub structures: HashMap<Identifier, Arc<HData>>,
 	pub statics: HashMap<Identifier, Arc<PStatic>>,
 	pub libraries: HashMap<Identifier, Arc<HLibrary>>,
-	pub global_annotations: Vec<(Identifier, Span, HValue)>,
 	pub roots: Vec<(Identifier, FIndex)>,
 	pub inclusions: Arc<Inclusions>,
 }
@@ -43,7 +42,6 @@ impl ItemTable {
 			structures: HashMap::new(),
 			statics: HashMap::new(),
 			libraries: HashMap::new(),
-			global_annotations: vec![],
 			inclusions: Arc::new(inclusions),
 			roots: vec![],
 		}
@@ -135,11 +133,11 @@ pub fn item_table(scope: QScope, path: &Path) -> crate::Result<Arc<ItemTable>> {
 	})
 }
 
-pub fn variables<'a>(scope: MScope, inclusions: &Inclusions, span: &TSpan,
+pub fn variables<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 					 node: &impl Node<'a>) -> crate::Result<HVariables> {
 	let mut variables = IndexMap::new();
 	for node in node.children().filter(|node| node.kind() == "variable") {
-		let (name, kind) = variable(scope, inclusions, span, node)?;
+		let (name, kind) = variable(scope, scene, span, node)?;
 		let (name, offset) = (name.node, name.span);
 		match variables.get(&name) {
 			None => variables.insert(name, (offset, kind)).unwrap_none(),
@@ -153,9 +151,9 @@ pub fn variables<'a>(scope: MScope, inclusions: &Inclusions, span: &TSpan,
 	Ok(variables)
 }
 
-pub fn variable<'a>(scope: MScope, inclusions: &Inclusions, span: &TSpan,
+pub fn variable<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 					node: impl Node<'a>) -> crate::Result<(S<Identifier>, S<HType>)> {
 	let kind = node.field(scope, "type")?;
-	let kind = super::kind(scope, inclusions, span, kind)?;
+	let kind = super::kind(scope, scene, span, kind)?;
 	Ok((node.identifier_span(scope, span)?, kind))
 }

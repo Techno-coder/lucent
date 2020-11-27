@@ -11,14 +11,25 @@ use crate::query::S;
 pub enum Path { Root, Node(Arc<Path>, Identifier) }
 
 impl Path {
-	pub fn append(&self, other: &Path) -> Path {
+	pub fn parent(&self) -> Option<&Arc<Path>> {
+		match self {
+			Path::Root => None,
+			Path::Node(parent, _) => Some(&parent),
+		}
+	}
+
+	pub fn append(self: &Arc<Self>, other: &Path) -> Arc<Path> {
 		match other {
 			Path::Root => self.clone(),
 			Path::Node(parent, name) => {
-				let path = Arc::new(self.append(parent));
-				Path::Node(path, name.clone())
+				let parent = self.append(parent);
+				Arc::new(Path::Node(parent, name.clone()))
 			}
 		}
+	}
+
+	pub fn push(self: &Arc<Self>, name: Identifier) -> Arc<Self> {
+		Arc::new(Path::Node(self.clone(), name))
 	}
 }
 

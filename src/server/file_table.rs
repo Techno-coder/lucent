@@ -17,7 +17,7 @@ impl FileTable {
 		for (path, segment, table) in &self.table {
 			if path == file { return Some(segment.clone()); }
 			if let Some(other) = table.find(file) {
-				return Some(Arc::new(segment.append(&other)));
+				return Some(segment.append(&other));
 			}
 		}
 		None
@@ -56,10 +56,10 @@ fn load_table(scope: QScope, path: Arc<Path>,
 
 fn load_symbols(scope: QScope, table: &mut FileTable, path: Arc<Path>,
 				segment: Arc<Path>, symbols: &SymbolTable) {
-	symbols.modules.iter().map(|(name, (_, module))| crate::Result::Ok({
-		let segment = Arc::new(Path::Node(segment.clone(), name.clone()));
-		let path = Arc::new(Path::Node(path.clone(), name.clone()));
-		match module {
+	symbols.modules.iter().map(|(name, (_, module))| {
+		let segment = segment.push(name.clone());
+		let path = path.push(name.clone());
+		crate::Result::Ok(match module {
 			ModuleLocation::Inline(symbols) =>
 				load_symbols(scope, table, path, segment, symbols),
 			ModuleLocation::External(file) => {
@@ -67,6 +67,6 @@ fn load_symbols(scope: QScope, table: &mut FileTable, path: Arc<Path>,
 				let file = crate::source::canonicalize(scope, file)?;
 				table.table.push((file, segment, external));
 			}
-		}
-	})).last();
+		})
+	}).last();
 }

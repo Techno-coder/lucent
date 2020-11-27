@@ -39,7 +39,8 @@
 					"function": ["entity.name.function"],
 					"constant": ["variable.other.constant"],
 					"property": ["variable.other.property"],
-					"global": ["variable.other.global"]
+					"global": ["variable.other.global"],
+					"attribute": ["meta.decorator"]
 				}
 			}
 		]

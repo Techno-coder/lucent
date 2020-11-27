@@ -2,13 +2,10 @@ use crate::query::S;
 
 use super::*;
 
-pub type SValue = Value<SNode>;
-pub type SIndex = VIndex<SNode>;
 pub type SReceiver = Receiver<SIndex>;
 
 #[derive(Debug)]
 pub struct SFunction {
-	pub value: SValue,
 	pub frame_size: usize,
 	pub convention: Convention,
 }

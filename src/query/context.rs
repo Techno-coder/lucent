@@ -10,6 +10,7 @@ use super::{E, key, Key, Scope, Table};
 /// `Context`s cannot be shared between
 /// compilation targets as two different items
 /// may resolve to the same path.
+// TODO: generate Context from macro
 #[derive(Debug, Default)]
 pub struct Context {
 	pub root: FilePath,
@@ -18,6 +19,7 @@ pub struct Context {
 	pub file_table: Table<key::FileTable>,
 	pub symbols: Table<key::Symbols>,
 	pub item_table: Table<key::ItemTable>,
+	pub globals: Table<key::GlobalAnnotations>,
 	pub functions: Table<key::Functions>,
 	pub statics: Table<key::Static>,
 	pub structure: Table<key::Structure>,
@@ -46,6 +48,7 @@ impl Context {
 			Key::FileTable(key) => self.file_table.errors(key),
 			Key::Symbols(key) => self.symbols.errors(key),
 			Key::ItemTable(key) => self.item_table.errors(key),
+			Key::GlobalAnnotations(key) => self.globals.errors(key),
 			Key::Functions(key) => self.functions.errors(key),
 			Key::Static(key) => self.statics.errors(key),
 			Key::Structure(key) => self.structure.errors(key),
@@ -71,6 +74,7 @@ impl Context {
 			Key::FileTable(key) => self.file_table.invalidate(key),
 			Key::Symbols(key) => self.symbols.invalidate(key),
 			Key::ItemTable(key) => self.item_table.invalidate(key),
+			Key::GlobalAnnotations(key) => self.globals.invalidate(key),
 			Key::Functions(key) => self.functions.invalidate(key),
 			Key::Static(key) => self.statics.invalidate(key),
 			Key::Structure(key) => self.structure.invalidate(key),

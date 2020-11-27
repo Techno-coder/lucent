@@ -43,6 +43,11 @@ impl<'a> PSource<'a> {
 	}
 }
 
+pub struct Scene<'a> {
+	pub inclusions: &'a Inclusions,
+	pub values: &'a mut VStore,
+}
+
 pub fn file_table(scope: QScope, symbols: &SymbolTable, inclusions: Inclusions,
 				  path: &FilePath) -> crate::Result<Arc<ItemTable>> {
 	let source = crate::source::source(scope, path)?;
@@ -53,8 +58,12 @@ pub fn file_table(scope: QScope, symbols: &SymbolTable, inclusions: Inclusions,
 
 pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: Inclusions,
 					   node: impl Node<'a>) -> Arc<ItemTable> {
-	let span = TSpan::offset(&symbols.span, node.span());
-	let module = HModule { span, annotations: HAnnotations::new() };
+	let module = HModule {
+		values: VStore::default(),
+		span: TSpan::offset(&symbols.span, node.span()),
+		annotations: HAnnotations::new(),
+	};
+
 	let mut table = ItemTable::new(module, inclusions);
 	let item = |node| item(scope, symbols, &mut table, node);
 	node.children().map(item).last();
@@ -63,8 +72,8 @@ pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: Inclusi
 
 fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 			node: impl Node<'a>) -> crate::Result<()> {
-	let base = &symbols.span;
 	let inclusions = &mut table.inclusions;
+	let base = &symbols.span;
 	Ok(match node.kind() {
 		"module" => {
 			let name = node.identifier(scope)?;
@@ -102,11 +111,14 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 			match module.kind() {
 				"string" => {
 					// TODO: implement C header loading
+					let path = module.text().into();
+					let mut values = VStore::default();
 					let identifier = node.identifier(scope)?;
 					let span = &symbols.libraries[&identifier];
 					let name = node.identifier_span(scope, span)?;
-					let annotations = annotations(scope, inclusions, span, &node)?;
-					let library = HLibrary { annotations, name, path: module.text().into() };
+					let scene = &mut Scene { inclusions, values: &mut values };
+					let annotations = annotations(scope, scene, span, &node)?;
+					let library = HLibrary { values, annotations, name, path };
 					table.libraries.insert(identifier, Arc::new(library));
 				}
 				"path" => {
@@ -139,19 +151,35 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 						"static" => {
 							let span = &symbols.statics[&identifier];
 							let library = library(scope, base)?;
-							let annotations = annotations(scope, inclusions, span, &node)?;
-							let (name, kind) = super::variable(scope, inclusions, span, node)?;
-							let load = HLoadStatic { library, reference, annotations, name, kind };
-							table.statics.insert(identifier, Arc::new(PStatic::Load(load)));
+							let mut values = VStore::default();
+
+							let scene = &mut Scene { inclusions, values: &mut values };
+							let annotations = annotations(scope, scene, span, &node)?;
+							let (name, kind) = super::variable(scope, scene, span, node)?;
+							let load = HLoadStatic {
+								values,
+								library,
+								reference,
+								annotations,
+								name,
+								kind,
+							};
+
+							let entry = Arc::new(PStatic::Load(load));
+							table.statics.insert(identifier, entry);
 						}
 						"signature" => {
+							let mut values = VStore::default();
+							let scene = &mut Scene { inclusions, values: &mut values };
 							let entry = table.functions.entry(identifier.clone()).or_default();
 							let span = &symbols.functions[&identifier][entry.len()];
-							let annotations = annotations(scope, inclusions, span, &node)?;
-							let signature = signature(scope, inclusions, span, &node)?;
+
+							let annotations = annotations(scope, scene, span, &node)?;
+							let signature = signature(scope, scene, span, &node)?;
 							let name = symbol.identifier_span(scope, span)?;
 							let library = library(scope, span)?;
 							let function = HLoadFunction {
+								values,
 								library,
 								reference,
 								annotations,
@@ -176,33 +204,39 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 				table.roots.push((identifier.clone(), entry.len()));
 			}
 
-			let annotations = annotations(scope, inclusions, span, &node)?;
-			let signature = signature(scope, inclusions, span, &node)?;
+			let mut values = VStore::default();
+			let scene = &mut Scene { inclusions, values: &mut values };
+			let annotations = annotations(scope, scene, span, &node)?;
+			let signature = signature(scope, scene, span, &node)?;
 			let name = node.identifier_span(scope, span)?;
 			let value = node.field(scope, "value")?;
-			let value = super::value_frame(scope, inclusions,
+			let value = super::value_frame(scope, scene,
 				span, &signature.parameters, value);
 
 			let entry = Arc::get_mut(entry).unwrap();
-			let function = HFunction { annotations, name, signature, value };
+			let function = HFunction { values, annotations, name, signature, value };
 			entry.push(Arc::new(PFunction::Local(function)));
 		}
 		"data" => {
+			let mut values = VStore::default();
 			let identifier = node.identifier(scope)?;
 			let span = &symbols.structures[&identifier];
 			let name = node.identifier_span(scope, span)?;
-			let fields = super::variables(scope, inclusions, span, &node)?;
-			let annotations = annotations(scope, inclusions, span, &node)?;
-			let data = Arc::new(HData { annotations, name, fields });
+			let scene = &mut Scene { inclusions, values: &mut values };
+			let fields = super::variables(scope, scene, span, &node)?;
+			let annotations = annotations(scope, scene, span, &node)?;
+			let data = Arc::new(HData { values, annotations, name, fields });
 			table.structures.insert(identifier, data);
 		}
 		"static" => {
+			let mut values = VStore::default();
 			let identifier = node.identifier(scope)?;
 			let span = &symbols.statics[&identifier];
+			let scene = &mut Scene { inclusions, values: &mut values };
 			let kind = node.attribute("type").map(|kind|
-				super::kind(scope, inclusions, span, kind)).transpose()?;
+				super::kind(scope, scene, span, kind)).transpose()?;
 			let value = node.attribute("value").map(|value|
-				super::value(scope, inclusions, span, value));
+				super::value(scope, scene, span, value));
 
 			if !kind.is_some() && !value.is_some() {
 				return E::error().message("static variable has no type")
@@ -211,23 +245,20 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 			}
 
 			let name = node.identifier_span(scope, span)?;
-			let annotations = annotations(scope, inclusions, span, &node)?;
-			let statics = PStatic::Local(HStatic { annotations, name, kind, value });
-			table.statics.insert(identifier, Arc::new(statics));
+			let annotations = annotations(scope, scene, span, &node)?;
+			let statics = HStatic { values, annotations, name, kind, value };
+			table.statics.insert(identifier, Arc::new(PStatic::Local(statics)));
 		}
 		"annotation" => {
 			let module = Arc::get_mut(&mut table.module).unwrap();
-			annotation(scope, inclusions, &mut module.annotations, base, node)?;
+			let scene = &mut Scene { inclusions, values: &mut module.values };
+			annotation(scope, scene, &mut module.annotations, base, node)?;
 		}
 		"global_annotation" => {
-			let identifier = node.field(scope, "name")?;
-			let name = Identifier(node.text().into());
-			let span = identifier.span();
-
-			let value = node.field(scope, "value")?;
-			let value = TSpan::scope(span, |span|
-				super::value(scope, inclusions, span, value));
-			table.global_annotations.push((name, span, value));
+			if inclusions.module.as_ref() != &Path::Root {
+				E::error().message("global annotation outside root module")
+					.label(node.span().label()).emit(scope);
+			}
 		}
 		_ => (),
 	})
@@ -250,30 +281,30 @@ pub fn path<'a>(scope: MScope, span: &TSpan,
 	}
 }
 
-pub fn signature<'a>(scope: MScope, inclusions: &Inclusions, span: &TSpan,
+pub fn signature<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 					 node: &impl Node<'a>) -> crate::Result<HSignature> {
 	Ok(HSignature {
 		convention: node.attribute("convention").map(|node|
 			node.identifier_span(scope, span)).transpose()?,
-		parameters: super::variables(scope, inclusions, span, node)?,
+		parameters: super::variables(scope, scene, span, node)?,
 		return_type: node.attribute("return").map(|node|
-			super::kind(scope, inclusions, span, node)).transpose()?
+			super::kind(scope, scene, span, node)).transpose()?
 			.unwrap_or_else(|| S::new(HType::Void, ISpan::internal())),
 	})
 }
 
-fn annotations<'a>(scope: MScope, inclusions: &Inclusions, span: &TSpan,
+fn annotations<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 				   node: &impl Node<'a>) -> crate::Result<HAnnotations> {
 	let mut annotations = HAnnotations::new();
 	node.children().filter(|node| node.kind() == "annotation").try_for_each(|node|
-		annotation(scope, inclusions, &mut annotations, span, node))?;
+		annotation(scope, scene, &mut annotations, span, node))?;
 	Ok(annotations)
 }
 
-fn annotation<'a>(scope: MScope, inclusions: &Inclusions, annotations: &mut HAnnotations,
+fn annotation<'a>(scope: MScope, scene: &mut Scene, annotations: &mut HAnnotations,
 				  span: &TSpan, node: impl Node<'a>) -> crate::Result<()> {
 	let value = node.field(scope, "value")?;
-	let value = super::value(scope, inclusions, span, value);
+	let value = super::value(scope, scene, span, value);
 	let name = node.identifier_span(scope, span)?;
 	let (name, offset) = (name.node, name.span);
 

@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use lsp_types::*;
 
 use crate::node::*;
@@ -57,7 +59,7 @@ impl<'a> Definitions<'a> {
 impl<'a> ReferenceVisitor<'a> for Definitions<'a> {
 	fn scope<'b>(&'b mut self) -> QScope<'a, 'a, 'b> { self.scope }
 
-	fn variable(&mut self, base: &TSpan, value: &HValue,
+	fn variable(&mut self, base: &TSpan, value: &Value,
 				parameters: Option<&HVariables>,
 				variable: &Variable, span: &ISpan) {
 		if !self.contains(TSpan::lift(base, *span)) { return; }
@@ -69,7 +71,7 @@ impl<'a> ReferenceVisitor<'a> for Definitions<'a> {
 			}
 		}
 
-		for other in value {
+		for (_, other) in value {
 			if let HNode::Let(other, _, _) = &other.node {
 				if &other.node == variable {
 					self.location(TSpan::lift(base, other.span));
@@ -78,12 +80,12 @@ impl<'a> ReferenceVisitor<'a> for Definitions<'a> {
 		}
 	}
 
-	fn field(&mut self, base: &TSpan, structure: &Path,
+	fn field(&mut self, base: &TSpan, structure: &Arc<Path>,
 			 name: &Identifier, span: &ISpan) {
 		if !self.contains(TSpan::lift(base, *span)) { return; }
 		let data = crate::parse::structure(self.scope, structure);
 		if let Some((span, _)) = data.unwrap().fields.get(name) {
-			let symbol = Symbol::Structure((*structure).clone());
+			let symbol = Symbol::Structure(structure.clone());
 			let target = ESpan::Item(symbol, *span).lift(self.scope);
 			self.location(target);
 		}
@@ -91,7 +93,7 @@ impl<'a> ReferenceVisitor<'a> for Definitions<'a> {
 
 	fn function(&mut self, base: &TSpan, path: &HPath, index: usize) {
 		if !self.item(base, path) { return; }
-		let path = FPath((*path.path()).clone(), index);
+		let path = FPath(path.path(), index);
 		let target = crate::parse::function(self.scope, &path);
 		let target = match target.unwrap().as_ref() {
 			Universal::Local(local) => local.name.span,
@@ -105,7 +107,7 @@ impl<'a> ReferenceVisitor<'a> for Definitions<'a> {
 
 	fn structure(&mut self, base: &TSpan, path: &HPath) {
 		if !self.item(base, path) { return; }
-		let path = (*path.path()).clone();
+		let path = path.path();
 		let target = crate::parse::structure(self.scope, &path);
 
 		let symbol = Symbol::Structure(path);
@@ -116,7 +118,7 @@ impl<'a> ReferenceVisitor<'a> for Definitions<'a> {
 
 	fn statics(&mut self, base: &TSpan, path: &HPath) {
 		if !self.item(base, path) { return; }
-		let path = (*path.path()).clone();
+		let path = path.path();
 		let target = crate::parse::statics(self.scope, &path);
 		let target = match target.unwrap().as_ref() {
 			Universal::Local(local) => local.name.span,
@@ -130,7 +132,7 @@ impl<'a> ReferenceVisitor<'a> for Definitions<'a> {
 
 	fn library(&mut self, base: &TSpan, path: &HPath) {
 		if !self.item(base, path) { return; }
-		let path = (*path.path()).clone();
+		let path = path.path();
 		let target = crate::parse::library(self.scope, &path);
 
 		let symbol = Symbol::Library(path);
@@ -157,7 +159,7 @@ impl<'a> ReferenceVisitor<'a> for Definitions<'a> {
 			symbols.libraries.contains_key(&name.node).then(|| self.library(base, path));
 
 			if symbols.functions.contains_key(&name.node) {
-				let path = (*path.path()).clone();
+				let path = path.path();
 				let targets = crate::parse::functions(self.scope, &path);
 				for (index, target) in targets.unwrap().iter().enumerate() {
 					let target = match target.as_ref() {

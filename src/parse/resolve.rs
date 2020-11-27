@@ -30,8 +30,8 @@ impl Inclusions {
 
 	pub fn scope(self: &Arc<Self>, module: Identifier) -> Self {
 		let parent = Some(self.clone());
-		let module = Path::Node(self.module.clone(), module);
-		Self::new(parent, Arc::new(module))
+		let module = self.module.clone().push(module);
+		Self::new(parent, module)
 	}
 
 	pub fn wildcard(self: &mut Arc<Self>, scope: QScope,
