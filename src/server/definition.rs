@@ -24,13 +24,13 @@ pub fn definition(scene: MScene, request: GotoDefinitionParams)
 	Ok(Some(GotoDefinitionResponse::Array(visitor.locations)))
 }
 
-struct Definitions<'a> {
-	scope: QScope<'a, 'a, 'a>,
+struct Definitions<'a, 'b> {
+	scope: QScope<'a, 'b, 'b>,
 	locations: Vec<Location>,
 	position: Position,
 }
 
-impl<'a> Definitions<'a> {
+impl<'a, 'b> Definitions<'a, 'b> {
 	fn item(&mut self, base: &TSpan, path: &HPath) -> bool {
 		match path {
 			HPath::Root(_) => false,
@@ -56,8 +56,8 @@ impl<'a> Definitions<'a> {
 	}
 }
 
-impl<'a> ReferenceVisitor<'a> for Definitions<'a> {
-	fn scope<'b>(&'b mut self) -> QScope<'a, 'a, 'b> { self.scope }
+impl<'a, 'b> ReferenceVisitor<'a, 'b> for Definitions<'a, 'b> {
+	fn scope<'c>(&'c mut self) -> QScope<'a, 'b, 'c> { self.scope }
 
 	fn variable(&mut self, base: &TSpan, value: &Value,
 				parameters: Option<&HVariables>,

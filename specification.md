@@ -81,18 +81,29 @@ truth
 never
 void
 ```
+
+Variables and expressions with the type `never` are guaranteed to be eliminated at compile time.
+
 ### Integral types
 ```
 u8
 u16
 u32
 u64
+usize
 i8
 i16
 i32
 i64
+isize
 ```
-If the type of an integer is ambiguous then it is assumed to be the smallest signed type that fits the value.
+
+Integral size types `usize` and `isize` are equivalent in width to a pointer in the contextual architecture.
+
+The type of an integral can be explicitly specified by casting it:
+```
+0 as usize
+```
 
 ## Pointer type
 ```
@@ -103,9 +114,10 @@ Pointer types are constructed by prefixing a type by an asterisk. The size of a 
 let variable: i32 = 0
 let pointer: *i32 = &variable
 ```
-Addition and subtraction can be performed on pointers with any integer type:
+Addition and subtraction can be performed on pointers with an integral size type:
 ```
-let pointer: *i32 = &variable + 1
+let offset: isize = 1
+let pointer: *i32 = &variable + offset
 ```
 The offset is dependent on the size of the pointed type.
 
@@ -244,7 +256,7 @@ Fixed size arrays must have the number of elements in the type.
 ```
 let identifier: [type;] = array[start:end]
 ```
-Slices are constructed from slicing an array. They can also be created from an address and size:
+Slices are constructed from slicing an array. They can also be created from a base address and size in elements:
 ```
 let identifier = [type;] address, size
 ```

@@ -21,6 +21,11 @@ impl ScopeHandle {
 	}
 }
 
+pub trait EScope<S> {
+	/// Adds an error to this query.
+	fn emit(&mut self, error: E<S>);
+}
+
 #[derive(Debug)]
 pub struct Scope<'a> {
 	pub ctx: &'a Context,
@@ -31,6 +36,10 @@ pub struct Scope<'a> {
 }
 
 impl<'a> Scope<'a> {
+	pub(super) fn cancelled(&self) -> bool {
+		self.handle.map(ScopeHandle::cancelled).unwrap_or(false)
+	}
+
 	pub(super) fn new(ctx: &'a Context, handle: Option<&'a ScopeHandle>,
 					  parent: Option<Key>) -> Self {
 		Self { ctx, handle, dependencies: vec![], parent, errors: vec![] }
@@ -40,21 +49,16 @@ impl<'a> Scope<'a> {
 		Self::new(ctx, handle, None)
 	}
 
-	/// Converts this scope to a `ParameterScope` by annotating
-	/// it with a source location span.
+	/// Converts this scope to a `QueryScope` by
+	/// annotating it with a source location span.
 	pub fn span(&mut self, span: impl Into<ESpan>) -> QueryScope<'a, '_> {
 		QueryScope { scope: self, span: span.into() }
 	}
+}
 
-	/// Adds an error to this query.
-	pub fn emit(&mut self, error: E) {
+impl EScope<ESpan> for Scope<'_> {
+	fn emit(&mut self, error: E) {
 		self.errors.push(error);
-	}
-
-	pub fn cancel(&self) {}
-
-	pub(super) fn cancelled(&self) -> bool {
-		self.handle.map(ScopeHandle::cancelled).unwrap_or(false)
 	}
 }
 
@@ -63,8 +67,14 @@ impl<'a> Scope<'a> {
 /// source location of the query invocation.
 #[derive(Debug)]
 pub struct QueryScope<'a, 'b> {
-	pub(super) scope: &'b mut Scope<'a>,
+	pub(super) scope: MScope<'a, 'b>,
 	pub span: ESpan,
+}
+
+impl EScope<ESpan> for QueryScope<'_, '_> {
+	fn emit(&mut self, error: E) {
+		self.scope.emit(error);
+	}
 }
 
 impl<'a, 'b> Deref for QueryScope<'a, 'b> {

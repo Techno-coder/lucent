@@ -10,7 +10,8 @@ use super::*;
 pub type GlobalAnnotations = HashMap<Identifier, HGlobalAnnotation>;
 pub type HAnnotations = HashMap<Identifier, (ISpan, VIndex)>;
 pub type HVariables = IndexMap<Identifier, (ISpan, S<HType>)>;
-pub type HFields = HashMap<Identifier, (ISpan, HIndex)>;
+pub type HFields = IndexMap<Identifier, (ISpan, HIndex)>;
+pub type HType = Type<HPath, HSignature, VIndex>;
 
 #[derive(Debug)]
 pub struct HModule {
@@ -19,6 +20,9 @@ pub struct HModule {
 	pub span: ISpan,
 }
 
+/// A locally defined static variable.
+/// At least one of `kind` and `value`
+/// is guaranteed to be present.
 #[derive(Debug, PartialEq)]
 pub struct HStatic {
 	pub values: VStore,
@@ -47,7 +51,7 @@ pub struct HFunction {
 
 #[derive(Debug, PartialEq)]
 pub struct HSignature {
-	pub convention: Option<S<Identifier>>,
+	pub convention: Convention,
 	pub parameters: HVariables,
 	pub return_type: S<HType>,
 }
@@ -116,7 +120,7 @@ pub enum HNode {
 	Function(HPath),
 	Static(HPath),
 	String(String),
-	Register(Identifier),
+	Register(Register),
 	Array(Vec<HIndex>),
 	Integral(i128),
 	Truth(bool),
@@ -186,18 +190,4 @@ impl HDual {
 			_ => return None,
 		})
 	}
-}
-
-#[derive(Debug, PartialEq)]
-pub enum HType {
-	Void,
-	Rune,
-	Truth,
-	Never,
-	Structure(HPath),
-	Integral(Sign, Width),
-	Pointer(Box<S<HType>>),
-	Function(Box<HSignature>),
-	Array(Box<S<HType>>, VIndex),
-	Slice(Box<S<HType>>),
 }

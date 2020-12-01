@@ -117,12 +117,12 @@ pub fn semantic_tokens(scene: MScene, request: SemanticTokensParams)
 	Ok(Some(tokens.into()))
 }
 
-struct Tokens<'a> {
-	scope: QScope<'a, 'a, 'a>,
+struct Tokens<'a, 'b> {
+	scope: QScope<'a, 'b, 'b>,
 	tokens: &'a mut Vec<(Position, u32, u32)>,
 }
 
-impl<'a> Tokens<'a> {
+impl<'a, 'b> Tokens<'a, 'b> {
 	fn token(&mut self, base: &TSpan, span: &ISpan, token: Token) {
 		if let Span(Some((file, (start, end)))) = TSpan::lift(base, *span) {
 			let position = position(&self.scope.ctx.files, file, start).unwrap();
@@ -138,8 +138,8 @@ impl<'a> Tokens<'a> {
 	}
 }
 
-impl<'a> ReferenceVisitor<'a> for Tokens<'a> {
-	fn scope<'b>(&'b mut self) -> QScope<'a, 'a, 'b> { self.scope }
+impl<'a, 'b> ReferenceVisitor<'a, 'b> for Tokens<'a, 'b> {
+	fn scope<'c>(&'c mut self) -> QScope<'a, 'b, 'c> { self.scope }
 
 	fn kind(&mut self, base: &TSpan, kind: &S<HType>) {
 		match kind.node {

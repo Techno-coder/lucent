@@ -1,4 +1,4 @@
-use crate::node::{HPath, HType, Identifier, Sign, Width};
+use crate::node::{HPath, HType, Sign, Width};
 use crate::query::{E, MScope, S};
 
 use super::{Node, Scene, TSpan};
@@ -15,7 +15,7 @@ pub fn kind<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 			let kind = node.field(scope, "type")?;
 			let size = node.field(scope, "size")?;
 			let kind = self::kind(scope, scene, span, kind)?;
-			let size = super::value(scope, scene, span, size);
+			let size = super::valued(scope, scene, span, size);
 			HType::Array(Box::new(kind), size)
 		}
 		"slice_type" => {
@@ -38,12 +38,13 @@ fn path_kind<'a>(scope: MScope, scene: &Scene, base: &TSpan,
 	let path = super::path(scope, base, node)?;
 	if let HPath::Node(module, name) = &path {
 		if module.as_ref() == &HPath::root() {
-			let Identifier(name) = &name.node;
-			match name.as_ref() {
+			match name.node.as_ref() {
 				"void" => return Ok(HType::Void),
 				"rune" => return Ok(HType::Rune),
 				"truth" => return Ok(HType::Truth),
 				"never" => return Ok(HType::Never),
+				"isize" => return Ok(HType::IntegralSize(Sign::Signed)),
+				"usize" => return Ok(HType::IntegralSize(Sign::Unsigned)),
 				"i8" => return Ok(HType::Integral(Sign::Signed, Width::B)),
 				"i16" => return Ok(HType::Integral(Sign::Signed, Width::W)),
 				"i32" => return Ok(HType::Integral(Sign::Signed, Width::D)),

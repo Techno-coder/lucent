@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::ops::{Deref, DerefMut};
 
+use indexmap::IndexMap;
+
 use crate::node::*;
 use crate::query::{E, MScope, QueryError, S};
 
@@ -45,8 +47,8 @@ impl<'a, 'b> DerefMut for Scene<'a, 'b> {
 
 /// Parses an `HValue`. This function does not return
 /// `Result` as any errors are replaced with `HNode::Error`.
-pub fn value<'a>(scope: MScope, scene: &mut super::Scene,
-				 span: &TSpan, node: impl Node<'a>) -> VIndex {
+pub fn valued<'a>(scope: MScope, scene: &mut super::Scene,
+				  span: &TSpan, node: impl Node<'a>) -> VIndex {
 	value_frame(scope, scene, span, &HVariables::new(), node)
 }
 
@@ -56,18 +58,18 @@ pub fn value_frame<'a>(scope: MScope, scene: &mut super::Scene, span: &TSpan,
 		let frames = vec![HashMap::from_iter(parameters
 			.keys().map(|key| (key.clone(), 0)))];
 		let scene = &mut Scene { frames, scene, value };
-		valued(scope, scene, span, &node)
+		self::value(scope, scene, span, &node)
 	});
 
 	let values = &mut scene.values;
 	values.insert(value)
 }
 
-fn valued<'a>(scope: MScope, scene: &mut Scene,
-			  base: &TSpan, node: &impl Node<'a>) -> HIndex {
+fn value<'a>(scope: MScope, scene: &mut Scene,
+			 base: &TSpan, node: &impl Node<'a>) -> HIndex {
 	let field = |scope: MScope, scene: &mut Scene, field| {
 		let field = node.field(scope, field)?;
-		Ok(valued(scope, scene, base, &field))
+		Ok(value(scope, scene, base, &field))
 	};
 
 	let label = node.span().label();
@@ -86,7 +88,7 @@ fn valued<'a>(scope: MScope, scene: &mut Scene,
 		"integral" => HNode::Integral(integral(scope, node)?),
 		"path" => paths(scope, scene, base, node)?.node,
 		"block" => scene.scope(|scene| HNode::Block(node.children()
-			.map(|node| valued(scope, scene, base, &node)).collect())),
+			.map(|node| value(scope, scene, base, &node)).collect())),
 		"group" => HNode::Block(vec![field(scope, scene, "value")?]),
 		// let variable: type = value
 		"let" => {
@@ -99,7 +101,7 @@ fn valued<'a>(scope: MScope, scene: &mut Scene,
 			let kind = node.attribute("type").map(|node|
 				super::kind(scope, scene, base, node)).transpose()?;
 			let value = node.attribute("value").map(|node|
-				valued(scope, scene, base, &node));
+				value(scope, scene, base, &node));
 			HNode::Let(variable, kind, value)
 		}
 		// variable = value
@@ -120,13 +122,13 @@ fn valued<'a>(scope: MScope, scene: &mut Scene,
 		}
 		// return value
 		"return" => HNode::Return(node.attribute("value")
-			.map(|node| valued(scope, scene, base, &node))),
+			.map(|node| value(scope, scene, base, &node))),
 		// if condition: statement
 		"when" => HNode::When(node.children().map(|node| {
 			let branch = node.field(scope, "branch")?;
-			let branch = valued(scope, scene, base, &branch);
+			let branch = value(scope, scene, base, &branch);
 			let condition = node.field(scope, "condition")?;
-			let condition = valued(scope, scene, base, &condition);
+			let condition = value(scope, scene, base, &condition);
 			Ok((condition, branch))
 		}).collect::<Result<_, _>>()?),
 		// while condition: statement
@@ -143,12 +145,12 @@ fn valued<'a>(scope: MScope, scene: &mut Scene,
 		}
 		// new Structure field: value
 		"new" => {
-			let mut fields = HashMap::new();
+			let mut fields = IndexMap::new();
 			for field in node.children().filter(|node| node.kind() == "field") {
 				let name = field.identifier_span(scope, base)?;
 				let (name, span) = (name.node, name.span);
 				let value = field.attribute("value")
-					.map(|node| Ok(valued(scope, scene, base, &node)));
+					.map(|node| Ok(value(scope, scene, base, &node)));
 				let value = value.unwrap_or_else(|| scene.generation(&name)
 					.map(|index| HNode::Variable(Variable(name.clone(), index)))
 					.map(|node| scene.value.insert(S::new(node, span)))
@@ -187,9 +189,9 @@ fn valued<'a>(scope: MScope, scene: &mut Scene,
 		"slice" => {
 			let value = field(scope, scene, "value")?;
 			let left = node.attribute("left").map(|node|
-				valued(scope, scene, base, &node));
+				self::value(scope, scene, base, &node));
 			let right = node.attribute("right").map(|node|
-				valued(scope, scene, base, &node));
+				self::value(scope, scene, base, &node));
 			HNode::Slice(value, left, right)
 		}
 		// variable[index]
@@ -200,14 +202,14 @@ fn valued<'a>(scope: MScope, scene: &mut Scene,
 		}
 		// [value]
 		"array" => scene.scope(|scene| HNode::Array(node.children()
-			.map(|node| valued(scope, scene, base, &node)).collect())),
+			.map(|node| value(scope, scene, base, &node)).collect())),
 		// path(value)
 		"call" => {
 			let arguments = node.field(scope, "arguments")?.children()
-				.map(|node| valued(scope, scene, base, &node)).collect();
+				.map(|node| value(scope, scene, base, &node)).collect();
 			let function = node.field(scope, "function")?;
 			if function.kind() != "path" {
-				let value = valued(scope, scene, base, &function);
+				let value = value(scope, scene, base, &function);
 				return Ok(HNode::Method(value, arguments));
 			}
 
@@ -229,11 +231,11 @@ fn valued<'a>(scope: MScope, scene: &mut Scene,
 		"unary" => {
 			let values = node.field(scope, "value")?;
 			match node.field(scope, "operator")?.text() {
-				"#" => HNode::Compile(value(scope, scene, base, values)),
-				"inline" => HNode::Inline(value(scope, scene, base, values)),
-				"!" => HNode::Unary(Unary::Not, valued(scope, scene, base, &values)),
-				"-" => HNode::Unary(Unary::Negate, valued(scope, scene, base, &values)),
-				"&" => HNode::Unary(Unary::Reference, valued(scope, scene, base, &values)),
+				"#" => HNode::Compile(valued(scope, scene, base, values)),
+				"inline" => HNode::Inline(valued(scope, scene, base, values)),
+				"!" => HNode::Unary(Unary::Not, value(scope, scene, base, &values)),
+				"-" => HNode::Unary(Unary::Negate, value(scope, scene, base, &values)),
+				"&" => HNode::Unary(Unary::Reference, value(scope, scene, base, &values)),
 				_ => E::error().message("invalid unary operator")
 					.label(label.clone()).result(scope)?,
 			}
@@ -255,7 +257,7 @@ fn valued<'a>(scope: MScope, scene: &mut Scene,
 		}
 		_ => {
 			let _: crate::Result<()> = node.invalid(scope);
-			let value = |node| valued(scope, scene, base, &node);
+			let value = |node| value(scope, scene, base, &node);
 			HNode::Error(node.children().map(value).collect())
 		}
 	}))().unwrap_or_else(|_: QueryError| HNode::Error(vec![]));

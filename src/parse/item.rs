@@ -17,6 +17,15 @@ pub enum Universal<V, L> {
 	Load(L),
 }
 
+impl PFunction {
+	pub fn signature(&self) -> &HSignature {
+		match self {
+			PFunction::Local(local) => &local.signature,
+			PFunction::Load(load) => &load.signature,
+		}
+	}
+}
+
 /// Stores items contained within a module.
 /// Only child items within the same file are
 /// reachable from a given table.
@@ -129,6 +138,30 @@ pub fn item_table(scope: QScope, path: &Path) -> crate::Result<Arc<ItemTable>> {
 					Ok(table.modules[name].clone())
 				}
 			}
+		}
+	})
+}
+
+pub fn value(scope: QScope, VPath(symbol, index): &VPath) -> crate::Result<Arc<Value>> {
+	let store = |store: &VStore| store[*index].clone();
+	Ok(match symbol {
+		Symbol::Module(path) => store(&module(scope, path)?.values),
+		Symbol::Library(path) => store(&library(scope, path)?.values),
+		Symbol::Static(path) => match statics(scope, path)?.as_ref() {
+			PStatic::Local(local) => store(&local.values),
+			PStatic::Load(load) => store(&load.values),
+		}
+		Symbol::Function(path) => match function(scope, path)?.as_ref() {
+			PFunction::Local(local) => store(&local.values),
+			PFunction::Load(load) => store(&load.values),
+		}
+		Symbol::Structure(path) => store(&structure(scope, path)?.values),
+		Symbol::Global(name) => {
+			let globals = super::global_annotations(scope)?;
+			let global = globals.get(name).ok_or_else(|| E::error()
+				.message(format!("undefined global annotation: {}", name))
+				.label(scope.span.label()).to(scope))?;
+			store(&global.values)
 		}
 	})
 }

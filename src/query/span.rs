@@ -1,7 +1,7 @@
 use std::fmt;
 use std::ops::Range;
 
-use codespan_reporting::diagnostic;
+use codespan_reporting::diagnostic::LabelStyle;
 
 use crate::node::{FPath, Identifier, Path, Symbol};
 use crate::parse::TSpan;
@@ -22,11 +22,11 @@ impl Span {
 		Self(None)
 	}
 
-	pub fn label(&self) -> Label {
+	pub fn label(&self) -> Label<ESpan> {
 		ESpan::from(self.clone()).label()
 	}
 
-	pub fn other(&self) -> Label {
+	pub fn other(&self) -> Label<ESpan> {
 		ESpan::from(self.clone()).other()
 	}
 
@@ -60,7 +60,15 @@ impl Span {
 pub struct ISpan(Option<(isize, isize)>);
 
 impl ISpan {
-	pub fn internal() -> Self {
+	pub fn label(&self) -> Label<Self> {
+		Label::new(LabelStyle::Primary, *self)
+	}
+
+	pub fn other(&self) -> Label<Self> {
+		Label::new(LabelStyle::Secondary, *self)
+	}
+
+	pub const fn internal() -> Self {
 		Self(None)
 	}
 }
@@ -74,12 +82,12 @@ pub enum ESpan {
 }
 
 impl ESpan {
-	pub fn label(&self) -> Label {
-		Label::new(diagnostic::LabelStyle::Primary, self.clone())
+	pub fn label(&self) -> Label<Self> {
+		Label::new(LabelStyle::Primary, self.clone())
 	}
 
-	pub fn other(&self) -> Label {
-		Label::new(diagnostic::LabelStyle::Secondary, self.clone())
+	pub fn other(&self) -> Label<Self> {
+		Label::new(LabelStyle::Secondary, self.clone())
 	}
 
 	pub fn lift(self, scope: QScope) -> Span {
@@ -137,7 +145,7 @@ pub struct S<T> {
 }
 
 impl<T> S<T> {
-	pub fn new(node: T, span: ISpan) -> Self {
+	pub const fn new(node: T, span: ISpan) -> Self {
 		S { node, span }
 	}
 }

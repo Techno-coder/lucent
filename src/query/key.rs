@@ -3,7 +3,7 @@ use std::hash::Hash;
 use std::sync::Arc;
 
 use crate::FilePath;
-use crate::node::Path;
+use crate::node::{Path, VPath};
 
 pub trait QueryKey: Debug + Clone + Hash + Eq + PartialEq + Into<Key> {
 	type Value: Debug;
@@ -62,4 +62,6 @@ queries! {
 	Structure(Path) -> crate::node::HData;
 	Library(Path) -> crate::node::HLibrary;
 	Module(Path) -> crate::node::HModule;
+
+	Types(VPath) -> crate::inference::Types;
 }

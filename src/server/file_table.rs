@@ -68,5 +68,5 @@ fn load_symbols(scope: QScope, table: &mut FileTable, path: Arc<Path>,
 				table.table.push((file, segment, external));
 			}
 		})
-	}).last();
+	}).for_each(drop);
 }

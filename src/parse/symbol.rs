@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use tree_sitter::QueryCursor;
-
 use crate::FilePath;
 use crate::node::{FIndex, Identifier, Path};
 use crate::query::{E, ISpan, MScope, QScope, QueryError, Span};
@@ -113,15 +111,24 @@ fn file_symbols(parent: QScope, path: &FilePath) -> crate::Result<Arc<SymbolTabl
 	let tree = super::parser().parse(source.text.as_bytes(), None).unwrap();
 	let (root, source) = (tree.root_node(), PSource::new(&source));
 
-	let errors = &super::errors();
-	let mut cursor = QueryCursor::new();
-	let captures = cursor.captures(errors, root,
-		|node| &source.text[node.byte_range()]);
-	let captures = captures.flat_map(|(node, _)| node.captures);
-	for node in captures.map(|capture| capture.node) {
-		let node = TreeNode::new(node, source);
-		let error = E::error().message("syntax error");
-		error.label(node.span().label()).emit(parent);
+	let mut recurse = true;
+	let mut cursor = root.walk();
+	loop {
+		let initial = recurse && cursor.goto_first_child();
+		if initial || cursor.goto_next_sibling() {
+			let node = TreeNode::new(cursor.node(), source);
+			if cursor.node().is_error() {
+				let error = E::error().message("syntax error");
+				error.label(node.span().label()).emit(parent);
+			} else if cursor.node().is_missing() {
+				let kind = cursor.node().kind();
+				let message = format!("missing '{}'", kind);
+				let error = E::error().message(message);
+				error.label(node.span().label()).emit(parent);
+			} else { recurse = true; }
+		} else if cursor.goto_parent() {
+			recurse = false;
+		} else { break; }
 	}
 
 	let root = TreeNode::new(root, source);
@@ -132,8 +139,8 @@ fn inline_table<'a>(scope: MScope, path: &FilePath, node: impl Node<'a>)
 					-> crate::Result<Arc<SymbolTable>> {
 	let span = TSpan(node.span());
 	let mut table = SymbolTable::new(span);
-	node.children().map(|node|
-		item(scope, path, &mut table, node)).last();
+	node.children().for_each(|node|
+		drop(item(scope, path, &mut table, node)));
 	Ok(Arc::new(table))
 }
 

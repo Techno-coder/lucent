@@ -25,6 +25,7 @@ pub struct Context {
 	pub structure: Table<key::Structure>,
 	pub library: Table<key::Library>,
 	pub module: Table<key::Module>,
+	pub types: Table<key::Types>,
 }
 
 impl Context {
@@ -54,6 +55,7 @@ impl Context {
 			Key::Structure(key) => self.structure.errors(key),
 			Key::Library(key) => self.library.errors(key),
 			Key::Module(key) => self.module.errors(key),
+			Key::Types(key) => self.types.errors(key),
 		};
 
 		match visited.contains(&key) {
@@ -80,6 +82,7 @@ impl Context {
 			Key::Structure(key) => self.structure.invalidate(key),
 			Key::Library(key) => self.library.invalidate(key),
 			Key::Module(key) => self.module.invalidate(key),
+			Key::Types(key) => self.types.invalidate(key),
 		}.iter().for_each(|key| self.invalidate(key))
 	}
 }

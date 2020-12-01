@@ -10,20 +10,35 @@ pub type Register = Identifier;
 pub type Convention = Option<S<Identifier>>;
 /// The overload index for functions with the same path.
 pub type FIndex = usize;
+/// A fully resolved and evaluated type.
+pub type RType = Type<Arc<Path>, Signature, usize>;
 
 #[derive(Debug, Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Identifier(pub Arc<str>);
 
+impl AsRef<str> for Identifier {
+	fn as_ref(&self) -> &str {
+		let Identifier(string) = self;
+		string.as_ref()
+	}
+}
+
 impl fmt::Display for Identifier {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		let Identifier(identifier) = self;
-		write!(f, "{}", identifier)
+		write!(f, "{}", self.as_ref())
 	}
 }
 
 /// Identifies a function by their path and overload index.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct FPath(pub Arc<Path>, pub FIndex);
+
+impl fmt::Display for FPath {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		let FPath(path, index) = self;
+		write!(f, "{}:{}", path, index)
+	}
+}
 
 /// Uniquely references an item.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
@@ -45,6 +60,15 @@ pub struct Variable(pub Identifier, pub usize);
 pub enum Sign {
 	Unsigned,
 	Signed,
+}
+
+impl fmt::Display for Sign {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", match self {
+			Sign::Unsigned => "u",
+			Sign::Signed => "i",
+		})
+	}
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -98,4 +122,61 @@ pub enum LoadReference {
 pub enum Receiver<I> {
 	Path(S<FPath>),
 	Method(Convention, I),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Signature {
+	pub convention: Option<S<Identifier>>,
+	pub parameters: Vec<S<RType>>,
+	pub return_type: S<RType>,
+}
+
+impl fmt::Display for Signature {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		if let Some(convention) = &self.convention {
+			write!(f, "{} ", convention.node)?;
+		}
+
+		write!(f, "fn(")?;
+		if let Some((last, parameters)) = self.parameters.split_last() {
+			parameters.iter().try_for_each(|parameter|
+				write!(f, "{}, ", parameter.node))?;
+			write!(f, "{}", last.node)?;
+		}
+
+		write!(f, ") {}", self.return_type.node)
+	}
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Type<P, F, V> {
+	Void,
+	Rune,
+	Truth,
+	Never,
+	Structure(P),
+	Integral(Sign, Width),
+	IntegralSize(Sign),
+	Pointer(Box<S<Self>>),
+	Function(Box<F>),
+	Array(Box<S<Self>>, V),
+	Slice(Box<S<Self>>),
+}
+
+impl fmt::Display for RType {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		match self {
+			Type::Void => write!(f, "void"),
+			Type::Rune => write!(f, "rune"),
+			Type::Truth => write!(f, "truth"),
+			Type::Never => write!(f, "never"),
+			Type::Structure(path) => write!(f, "{}", path),
+			Type::Integral(sign, width) => write!(f, "{}{}", sign, width),
+			Type::IntegralSize(sign) => write!(f, "{}size", sign),
+			Type::Pointer(kind) => write!(f, "*{}", kind.node),
+			Type::Function(signature) => write!(f, "{}", signature),
+			Type::Array(kind, size) => write!(f, "[{}; {}]", kind.node, size),
+			Type::Slice(kind) => write!(f, "[{};]", kind.node),
+		}
+	}
 }

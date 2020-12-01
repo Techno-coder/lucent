@@ -1,4 +1,5 @@
-use std::ops::{Deref, DerefMut, Index};
+use std::ops::Index;
+use std::sync::Arc;
 
 use crate::query::S;
 
@@ -75,14 +76,30 @@ pub struct VIndex(usize);
 
 /// A container for values. The graph
 /// of `Value` references forms a tree.
+///
+/// The values are ordered such that values later
+/// in the list will only depend on previously
+/// encountered values. For convenience,
+/// iteration occurs in reverse order.
 #[derive(Debug, Default, PartialEq)]
-pub struct VStore(pub Vec<Value>);
+pub struct VStore(Vec<Arc<Value>>);
 
 impl VStore {
 	pub fn insert(&mut self, value: Value) -> VIndex {
-		let index = self.len();
-		self.push(value);
+		let VStore(store) = self;
+		let index = store.len();
+		store.push(Arc::new(value));
 		VIndex(index)
+	}
+}
+
+impl Index<VIndex> for VStore {
+	type Output = Arc<Value>;
+
+	fn index(&self, VIndex(index): VIndex) -> &Self::Output {
+		let VStore(store) = self;
+		store.get(index).unwrap_or_else(||
+			panic!("value index: {}, is invalid", index))
 	}
 }
 
@@ -91,28 +108,14 @@ impl<'a> IntoIterator for &'a VStore {
 	type IntoIter = StoreValues<'a>;
 
 	fn into_iter(self) -> Self::IntoIter {
-		StoreValues { store: self, index: 0 }
-	}
-}
-
-impl Deref for VStore {
-	type Target = Vec<Value>;
-
-	fn deref(&self) -> &Self::Target {
-		let VStore(values) = self;
-		values
-	}
-}
-
-impl DerefMut for VStore {
-	fn deref_mut(&mut self) -> &mut Self::Target {
-		let VStore(values) = self;
-		values
+		let VStore(store) = &self;
+		let index = store.len();
+		StoreValues { store, index }
 	}
 }
 
 pub struct StoreValues<'a> {
-	store: &'a VStore,
+	store: &'a Vec<Arc<Value>>,
 	index: usize,
 }
 
@@ -120,9 +123,10 @@ impl<'a> Iterator for StoreValues<'a> {
 	type Item = (VIndex, &'a Value);
 
 	fn next(&mut self) -> Option<Self::Item> {
-		let node = self.store.get(self.index)
-			.map(|node| (VIndex(self.index), node))?;
-		self.index += 1;
-		Some(node)
+		(self.index != 0).then(|| {
+			self.index -= 1;
+			let node = &self.store[self.index];
+			(VIndex(self.index), node.as_ref())
+		})
 	}
 }

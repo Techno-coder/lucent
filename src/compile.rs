@@ -3,17 +3,25 @@ use crate::query::{Context, Scope, Span};
 
 pub fn compile(path: FilePath) -> std::io::Result<()> {
 	use crate::node::*;
+	use crate::parse::PFunction;
 	use std::sync::Arc;
 
 	let ctx = Context::new(path);
 	let mut scope = Scope::root(&ctx, None);
 	let queries = &mut scope.span(Span::internal());
 
-	let path = Path::Root;
-	let path = Path::Node(Arc::new(path), Identifier("Main".into()));
-	let path = Path::Node(Arc::new(path), Identifier("fibonacci".into()));
-	let functions = crate::parse::functions(queries, &path);
-	println!("{:#?}", functions);
+	let path = Arc::new(Path::Root);
+	let path = path.push(Identifier("Main".into()));
+	let path = path.push(Identifier("fibonacci".into()));
+
+	let path = FPath(path, 0);
+	let function = crate::parse::function(queries, &path).unwrap();
+	let path = VPath(Symbol::Function(path), match function.as_ref() {
+		PFunction::Local(local) => local.value,
+		_ => panic!("expected local function"),
+	});
+
+	let _ = crate::inference::types(queries, &path).unwrap();
 
 	display_diagnostics(scope)
 }

@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use tree_sitter::{Language, Parser, Query};
+use tree_sitter::{Language, Parser};
 
 use crate::FilePath;
 use crate::node::*;
@@ -19,11 +19,6 @@ pub fn parser() -> Parser {
 	let mut parser = Parser::new();
 	parser.set_language(language()).unwrap();
 	parser
-}
-
-pub fn errors() -> Query {
-	let query = "(ERROR) @error";
-	Query::new(language(), query).unwrap()
 }
 
 /// Contains references to `Source` instances.
@@ -60,13 +55,13 @@ pub fn parse_table<'a>(scope: MScope, symbols: &SymbolTable, inclusions: Inclusi
 					   node: impl Node<'a>) -> Arc<ItemTable> {
 	let module = HModule {
 		values: VStore::default(),
-		span: TSpan::offset(&symbols.span, node.span()),
+		span: node.offset(&symbols.span),
 		annotations: HAnnotations::new(),
 	};
 
 	let mut table = ItemTable::new(module, inclusions);
-	let item = |node| item(scope, symbols, &mut table, node);
-	node.children().map(item).last();
+	let item = &mut |node| item(scope, symbols, &mut table, node);
+	node.children().for_each(|node| drop(item(node)));
 	Arc::new(table)
 }
 
@@ -236,7 +231,7 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 			let kind = node.attribute("type").map(|kind|
 				super::kind(scope, scene, span, kind)).transpose()?;
 			let value = node.attribute("value").map(|value|
-				super::value(scope, scene, span, value));
+				super::valued(scope, scene, span, value));
 
 			if !kind.is_some() && !value.is_some() {
 				return E::error().message("static variable has no type")
@@ -285,7 +280,7 @@ pub fn signature<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 					 node: &impl Node<'a>) -> crate::Result<HSignature> {
 	Ok(HSignature {
 		convention: node.attribute("convention").map(|node|
-			node.identifier_span(scope, span)).transpose()?,
+			S::new(Identifier(node.text().into()), node.offset(span))),
 		parameters: super::variables(scope, scene, span, node)?,
 		return_type: node.attribute("return").map(|node|
 			super::kind(scope, scene, span, node)).transpose()?
@@ -296,15 +291,16 @@ pub fn signature<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 fn annotations<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 				   node: &impl Node<'a>) -> crate::Result<HAnnotations> {
 	let mut annotations = HAnnotations::new();
-	node.children().filter(|node| node.kind() == "annotation").try_for_each(|node|
-		annotation(scope, scene, &mut annotations, span, node))?;
+	node.children().filter(|node| node.kind() == "annotation")
+		.try_for_each(|node| annotation(scope,
+			scene, &mut annotations, span, node))?;
 	Ok(annotations)
 }
 
 fn annotation<'a>(scope: MScope, scene: &mut Scene, annotations: &mut HAnnotations,
 				  span: &TSpan, node: impl Node<'a>) -> crate::Result<()> {
 	let value = node.field(scope, "value")?;
-	let value = super::value(scope, scene, span, value);
+	let value = super::valued(scope, scene, span, value);
 	let name = node.identifier_span(scope, span)?;
 	let (name, offset) = (name.node, name.span);
 

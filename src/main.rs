@@ -1,5 +1,7 @@
 #![feature(option_unwrap_none)]
 #![feature(bool_to_option)]
+#![feature(box_patterns)]
+#![feature(or_patterns)]
 #![feature(once_cell)]
 
 mod node;
@@ -9,6 +11,7 @@ mod compile;
 mod query;
 mod parse;
 // mod analysis;
+mod inference;
 mod interface;
 mod source;
 mod server;

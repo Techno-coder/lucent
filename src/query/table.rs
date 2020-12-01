@@ -52,7 +52,7 @@ impl<K: QueryKey> Table<K> {
 							// means a query can be executed more than once
 							// for a particular key.
 							set.insert(kind);
-							std::mem::drop(lock);
+							drop(lock);
 
 							let mut scoped = Scope::new(scope.ctx,
 								scope.handle, Some(key.clone().into()));
@@ -72,7 +72,7 @@ impl<K: QueryKey> Table<K> {
 			entry::Entry::Vacant(lock) => {
 				let mut entry = lock.insert(Entry::pending());
 				entry.dependents.extend(scope.parent.clone());
-				std::mem::drop(entry);
+				drop(entry);
 
 				let mut scoped = Scope::new(scope.ctx,
 					scope.handle, Some(key.clone().into()));

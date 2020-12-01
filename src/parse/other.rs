@@ -26,7 +26,7 @@ pub fn global_annotations(scope: QScope) -> crate::Result<Arc<GlobalAnnotations>
 
 			let value = node.field(scope, "value")?;
 			let value = TSpan::scope(span, |span|
-				super::value(scope, scene, span, value));
+				super::valued(scope, scene, span, value));
 			let annotation = HGlobalAnnotation { values, value, span };
 
 			match annotations.get(&name) {
