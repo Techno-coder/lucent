@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use crate::node::{FPath, HBinary, HDual, HIndex, HNode, RType, Sign, Unary, VPath};
 use crate::query::{E, ISpan, S};
 
@@ -23,7 +25,7 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 	let span = scene.value[*index].span;
 	let insert = |scene: &mut Scene, kind: S<RType>| scene
 		.types.nodes.insert(*index, kind).unwrap_none();
-	let conflict = |kind: IType, found: &str| {
+	let conflict = |kind: IType, found: &dyn Display| {
 		let expected = format!("expected: {}", kind);
 		let note = format!("{}, found: {}", expected, found);
 		E::error().message("mismatched types")
@@ -33,11 +35,30 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 
 	let node = &scene.value[*index].node;
 	(|| Some(match (node, kind) {
+		(_, kind!(RType::Void)) => drop(super::synthesize(scene, index)),
 		(HNode::Block(nodes), IType::Type(kind)) => {
 			let (last, nodes) = nodes.split_last().unwrap();
 			nodes.iter().for_each(|node| drop(super::synthesize(scene, node)));
 			check(scene, last, super::raise(kind.clone()));
 			insert(scene, kind);
+		}
+		(HNode::When(branches), IType::Type(kind)) => {
+			let mut complete = false;
+			for (condition, node) in branches {
+				let other = &scene.value[*condition].node;
+				complete |= matches!(other, HNode::Truth(true));
+				super::check(scene, node, super::raise(kind.clone()));
+				super::check(scene, condition, super::TRUTH);
+			}
+
+			let void = S::new(RType::Void, ISpan::internal());
+			match complete || unifies(&kind, &void) {
+				true => insert(scene, kind.clone()),
+				false => conflict(IType::Type(kind), &void.node)
+					.note("expression is missing default branch")
+					.note("add a branch with condition: true")
+					.emit(scene.scope),
+			}
 		}
 		(HNode::Slice(node, left, right), kind!(RType::Slice(box kind))) |
 		(HNode::Slice(node, left, right), IType::Sequence(kind)) => {
@@ -130,8 +151,9 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 		(HNode::Integral(_), kind!(span, RType::Integral(sign, width))) =>
 			insert(scene, S::new(RType::Integral(sign, width), span)),
 		(HNode::Integral(_), kind) =>
-			conflict(kind, "<integral>").emit(scene.scope),
+			conflict(kind, &"<integral>").emit(scene.scope),
 		(HNode::Register(_), IType::Type(kind)) => insert(scene, kind),
+		(HNode::Inline(_), IType::Type(kind)) => insert(scene, kind),
 		(HNode::Compile(index), kind) => {
 			let path = VPath(scene.scope.symbol.clone(), *index);
 			let scope = &mut scene.scope.span(span);
@@ -142,7 +164,7 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 		(_, kind) => {
 			let target = super::synthesize(scene, index)?;
 			if !unify(&target, &kind) {
-				let error = conflict(kind, &target.node.to_string());
+				let error = conflict(kind, &target.node);
 				match target.span != scene.value[*index].span {
 					true => error.label(target.span.other()
 						.message("type originates here")),

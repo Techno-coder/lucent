@@ -82,7 +82,7 @@ never
 void
 ```
 
-Variables and expressions with the type `never` are guaranteed to be eliminated at compile time.
+Variables and expressions with the type `never` are guaranteed to be eliminated at compile time. It is the responsibility of the user to ensure no function with the `never` type returns.
 
 ### Integral types
 ```

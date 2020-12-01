@@ -45,25 +45,21 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			RType::Void
 		}
 		HNode::When(branches) => {
-			let ((condition, first), nodes) =
-				branches.split_first().unwrap();
-			super::check(scene, condition, TRUTH);
-			let first = synthesize(scene, first)?;
-
-			let mut equal = true;
-			let mut complete = false;
-			for (condition, node) in nodes {
+			let mut first = None;
+			let (mut equal, mut complete) = (true, false);
+			for (condition, node) in branches {
 				super::check(scene, condition, TRUTH);
-				let condition = &scene.value[*condition].node;
-				complete |= matches!(condition, HNode::Truth(true));
-				if let Some(kind) = synthesize(scene, node) {
-					equal &= super::unifies(&first, &kind);
-				}
+				let other = &scene.value[*condition].node;
+				complete |= matches!(other, HNode::Truth(true));
+				synthesize(scene, node).map(|kind| match first.as_ref() {
+					Some(first) => equal &= super::unifies(&first, &kind),
+					None => first = Some(kind),
+				});
 			}
 
 			match equal && complete {
 				false => RType::Void,
-				true => first.node,
+				true => first?.node,
 			}
 		}
 		HNode::Cast(node, kind) => {
@@ -259,8 +255,8 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 				},
 			}
 		}
-		HNode::Variable(variable) => scene.types
-			.variables.get(variable).cloned()?.node,
+		HNode::Variable(variable) => return scene
+			.types.variables.get(variable).cloned(),
 		HNode::Function(path) => {
 			let path = path.path();
 			let scope = &mut scene.scope.span(span);

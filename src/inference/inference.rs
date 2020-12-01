@@ -73,11 +73,9 @@ pub fn hint(scope: QScope, path: &VPath,
 		let value = value.as_ref();
 		let scope = &mut ItemScope::path(scope, path.clone());
 		let mut scene = Scene { scope, return_type, value, types };
-		let returned = scene.return_type.clone().and_then(|kind|
-			(kind.node != RType::Void).then(|| super::raise(kind)));
-		match Option::or(hint, returned) {
-			None => drop(super::synthesize(&mut scene, &value.root)),
+		match Option::or(hint, scene.return_type.clone().map(super::raise)) {
 			Some(hint) => super::check(&mut scene, &value.root, hint),
+			None => drop(super::synthesize(&mut scene, &value.root)),
 		}
 
 		Ok(Arc::new(scene.types))
