@@ -2,8 +2,7 @@ use lsp_server::{Connection, Message, Notification};
 use lsp_types::*;
 use lsp_types::notification::{self, *};
 use lsp_types::request::*;
-
-use crate::query::Context;
+use parking_lot::RwLock;
 
 use super::{Dispatch, RequestDispatch, Scene};
 
@@ -28,33 +27,29 @@ pub fn server() -> crate::GenericResult {
 
 fn serve(connection: &Connection, parameters: serde_json::Value) -> crate::GenericResult {
 	let parameters: InitializeParams = serde_json::from_value(parameters).unwrap();
+	super::register_watchers(connection);
 
-	// TODO: start single file mode if root path is invalid
-	let workspace = parameters.root_uri.unwrap().to_file_path().unwrap();
+	let mut scene = Scene::new(connection, parameters.root_uri
+		.map(|path| path.to_file_path().unwrap()));
+	super::populate_targets(&mut scene);
+	let scene = &RwLock::new(scene);
 
-	// TODO: dynamically load root file
-	let root = workspace.join("Main.lc");
-
-	let ctx = &Context::new(root);
-	let scene = &mut Scene::new(ctx, connection);
-	Ok(for message in &connection.receiver {
-		match message {
-			Message::Request(packet) => {
-				if connection.handle_shutdown(&packet)? { return Ok(()); }
-				RequestDispatch::new(scene, packet)
-					.on::<GotoDefinition, _>(super::definition)
-					.on::<SemanticTokensRequest, _>(super::semantic_tokens)
-					.finish();
-			}
-			Message::Response(_response) => (),
-			Message::Notification(packet) => Dispatch::new(scene, packet)
-				.on(notification::<DidOpenTextDocument>, super::open_text_document)
-				.on(notification::<DidChangeTextDocument>, super::change_text_document)
-				.on(notification::<DidCloseTextDocument>, super::close_text_document)
-				.on(notification::<DidChangeWatchedFiles>, super::change_watched_files)
-				.finish(),
+	Ok(connection.receiver.iter().for_each(|message| match message {
+		Message::Request(packet) => {
+			if connection.handle_shutdown(&packet).unwrap() { return; }
+			RequestDispatch::new(&scene.read(), packet)
+				.on::<SemanticTokensRequest, _>(super::semantic_tokens)
+				.on::<GotoDefinition, _>(super::definition)
+				.finish();
 		}
-	})
+		Message::Response(_) => (),
+		Message::Notification(packet) => Dispatch::new(scene, packet)
+			.on(notification::<DidOpenTextDocument>, super::open_text_document)
+			.on(notification::<DidChangeTextDocument>, super::change_text_document)
+			.on(notification::<DidCloseTextDocument>, super::close_text_document)
+			.on(notification::<DidChangeWatchedFiles>, super::change_watched_files)
+			.finish(),
+	}))
 }
 
 fn notification<E>(event: Notification) -> Result<E::Params, Notification>

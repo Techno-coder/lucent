@@ -12,6 +12,8 @@ pub struct ScopeHandle {
 }
 
 impl ScopeHandle {
+	/// Cancels the execution of queries attached
+	/// to this handle. This is irrevocable.
 	pub fn cancel(&self) {
 		self.cancel.store(true, Ordering::SeqCst);
 	}

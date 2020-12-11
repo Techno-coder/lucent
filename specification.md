@@ -66,7 +66,7 @@ Literals can be separated with primes: `'`.
 ```
 'rune'
 ```
-Character or literals are enclosed within a pair of single quotes.
+Character literals are enclosed within a pair of single quotes.
 
 ### Registers
 ```

@@ -4,8 +4,8 @@ use crate::node::*;
 use crate::parse::*;
 use crate::query::{ISpan, QScope, S};
 
-pub trait Visitor<'a: 'b, 'b> {
-	fn scope<'c>(&'c mut self) -> QScope<'a, 'b, 'c>;
+pub trait Visitor<'a: 'b, 'b: 'c, 'c> {
+	fn scope<'d>(&'d mut self) -> QScope<'a, 'b, 'd>;
 	fn table(&mut self, _table: &ItemTable, _symbols: &SymbolTable) {}
 	/// Invoked on each value present in the table. Values
 	/// belonging to a particular item are guaranteed to
@@ -14,8 +14,8 @@ pub trait Visitor<'a: 'b, 'b> {
 			 parameters: Option<&HVariables>);
 }
 
-pub trait ReferenceVisitor<'a: 'b, 'b> {
-	fn scope<'c>(&'c mut self) -> QScope<'a, 'b, 'c>;
+pub trait ReferenceVisitor<'a: 'b, 'b: 'c, 'c> {
+	fn scope<'d>(&'d mut self) -> QScope<'a, 'b, 'd>;
 	fn kind(&mut self, _base: &TSpan, _kind: &S<HType>) {}
 	fn variable(&mut self, base: &TSpan, value: &Value,
 				parameters: Option<&HVariables>,
@@ -37,8 +37,8 @@ pub trait ReferenceVisitor<'a: 'b, 'b> {
 	fn path(&mut self, base: &TSpan, path: &HPath);
 }
 
-impl<'a: 'b, 'b, T: ReferenceVisitor<'a, 'b>> Visitor<'a, 'b> for T {
-	fn scope<'c>(&'c mut self) -> QScope<'a, 'b, 'c> { self.scope() }
+impl<'a: 'b, 'b: 'c, 'c, T: ReferenceVisitor<'a, 'b, 'c>> Visitor<'a, 'b, 'c> for T {
+	fn scope<'d>(&'d mut self) -> QScope<'a, 'b, 'd> { self.scope() }
 
 	fn table(&mut self, table: &ItemTable, symbols: &SymbolTable) {
 		for (name, structure) in &table.structures {
@@ -105,8 +105,8 @@ impl<'a: 'b, 'b, T: ReferenceVisitor<'a, 'b>> Visitor<'a, 'b> for T {
 	}
 }
 
-pub fn traverse<'a: 'b, 'b>(visitor: &mut impl Visitor<'a, 'b>,
-							table: &ItemTable, symbols: &SymbolTable) {
+pub fn traverse<'a: 'b, 'b: 'c, 'c>(visitor: &mut impl Visitor<'a, 'b, 'c>,
+									table: &ItemTable, symbols: &SymbolTable) {
 	visitor.table(table, symbols);
 	let module = &table.inclusions.module;
 	let symbol = Symbol::Module(module.clone());
@@ -156,16 +156,16 @@ pub fn traverse<'a: 'b, 'b>(visitor: &mut impl Visitor<'a, 'b>,
 	}
 }
 
-fn valued<'a: 'b, 'b>(visitor: &mut impl Visitor<'a, 'b>,
-					  base: &TSpan, symbol: Symbol, values: &VStore) {
+fn valued<'a: 'b, 'b: 'c, 'c>(visitor: &mut impl Visitor<'a, 'b, 'c>,
+							  base: &TSpan, symbol: Symbol, values: &VStore) {
 	for (index, value) in values {
 		let path = VPath(symbol.clone(), index.clone());
 		visitor.value(base, path, value, None);
 	}
 }
 
-fn kind<'a: 'b, 'b>(visitor: &mut impl ReferenceVisitor<'a, 'b>,
-					base: &TSpan, kind: &S<HType>) {
+fn kind<'a: 'b, 'b: 'c, 'c>(visitor: &mut impl ReferenceVisitor<'a, 'b, 'c>,
+							base: &TSpan, kind: &S<HType>) {
 	visitor.kind(base, kind);
 	match &kind.node {
 		HType::Structure(path) => visitor.structure(base, path),
@@ -177,14 +177,14 @@ fn kind<'a: 'b, 'b>(visitor: &mut impl ReferenceVisitor<'a, 'b>,
 	}
 }
 
-fn signature<'a: 'b, 'b>(visitor: &mut impl ReferenceVisitor<'a, 'b>,
-						 base: &TSpan, signature: &HSignature) {
+fn signature<'a: 'b, 'b: 'c, 'c>(visitor: &mut impl ReferenceVisitor<'a, 'b, 'c>,
+								 base: &TSpan, signature: &HSignature) {
 	variables(visitor, base, &signature.parameters);
 	kind(visitor, base, &signature.return_type);
 }
 
-fn variables<'a: 'b, 'b>(visitor: &mut impl ReferenceVisitor<'a, 'b>,
-						 base: &TSpan, variables: &HVariables) {
+fn variables<'a: 'b, 'b: 'c, 'c>(visitor: &mut impl ReferenceVisitor<'a, 'b, 'c>,
+								 base: &TSpan, variables: &HVariables) {
 	variables.values().for_each(|(_, kind)|
 		self::kind(visitor, base, kind));
 }

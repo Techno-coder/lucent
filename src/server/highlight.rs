@@ -10,7 +10,7 @@ use crate::node::{HPath, HType, HVariables, Identifier, Path, Value, Variable};
 use crate::parse::TSpan;
 use crate::query::{ISpan, QScope, S, Span};
 
-use super::{MScene, ReferenceVisitor};
+use super::{ReferenceVisitor, RScene};
 
 macro_rules! root { () => { env!("CARGO_MANIFEST_DIR") }; }
 macro_rules! path { () => { "/tree-sitter-lucent/queries/highlights.scm" }; }
@@ -49,49 +49,57 @@ pub fn semantic_tokens_options() -> SemanticTokensOptions {
 	SemanticTokensOptions { legend, document_provider, ..Default::default() }
 }
 
-pub fn semantic_tokens(scene: MScene, request: SemanticTokensParams)
+pub fn semantic_tokens(scene: RScene, request: SemanticTokensParams)
 					   -> crate::Result<Option<SemanticTokensResult>> {
 	let language = crate::parse::language();
 	let mut highlight = Configuration::new(language,
 		HIGHLIGHTS, "", "").unwrap();
 	highlight.configure(&TOKENS);
 
-	scope!(scope, scene);
-	let path = request.text_document.uri.to_file_path().unwrap();
-	let file = crate::source::file(scope, &path)?;
-	let source = scope.ctx.files.source(file).unwrap();
-	let highlights = &mut Highlighter::new();
-	let highlights = highlights.highlight(&highlight,
-		source.text.as_bytes(), None, |_| None).unwrap();
-
-	// Add base highlighting tokens.
 	let mut tokens = Vec::new();
-	let mut token: Option<u32> = None;
-	for event in highlights {
-		match event.unwrap() {
-			HighlightEvent::Source { start, end } => if let Some(token) = token {
-				let position = position(&scope.ctx.files, file, start).unwrap();
-				tokens.push((position, (end - start) as u32, token));
+	let path = request.text_document.uri;
+	let path = path.to_file_path().unwrap();
+	for scope in &mut scene.scopes(&path) {
+		let scope = &mut scope.span(Span::internal());
+		let file = crate::source::file(scope, &path)?;
+		let source = scope.ctx.files.source(file).unwrap();
+		let highlights = &mut Highlighter::new();
+		let highlights = highlights.highlight(&highlight,
+			source.text.as_bytes(), None, |_| None).unwrap();
+
+		// Add base highlighting tokens.
+		let mut token: Option<u32> = None;
+		for event in highlights {
+			match event.unwrap() {
+				HighlightEvent::Source { start, end } => if let Some(token) = token {
+					let position = position(&scope.ctx.files, file, start).unwrap();
+					tokens.push((position, (end - start) as u32, token));
+				}
+				// Highlight spans may not overlap so
+				// highlights do not need to be scoped.
+				HighlightEvent::HighlightEnd => token = None,
+				HighlightEvent::HighlightStart(index) => {
+					let Highlight(index) = index;
+					token = Some(index as u32)
+				}
 			}
-			// Highlight spans may not overlap so
-			// highlights do not need to be scoped.
-			HighlightEvent::HighlightEnd => token = None,
-			HighlightEvent::HighlightStart(index) => {
-				let Highlight(index) = index;
-				token = Some(index as u32)
-			}
+		}
+
+		// Add path highlighting tokens.
+		for module in &super::file_modules(scope, &path)? {
+			let symbols = &crate::parse::symbols(scope, module)?;
+			let table = &crate::parse::item_table(scope, module)?;
+			let visitor = &mut Tokens { scope, tokens: &mut tokens };
+			super::traverse(visitor, table, symbols);
 		}
 	}
 
-	// Add path highlighting tokens.
-	let module = &super::file_module(scope, &path)?;
-	let symbols = &crate::parse::symbols(scope, module)?;
-	let table = &crate::parse::item_table(scope, module)?;
-	let visitor = &mut Tokens { scope, tokens: &mut tokens };
-	super::traverse(visitor, table, symbols);
+	// Sort and remove duplicate tokens.
+	// Duplicates arise from multiple targets.
+	tokens.sort_unstable();
+	tokens.dedup();
 
 	// Differentiate token positions.
-	tokens.sort();
 	let mut data = Vec::new();
 	let mut last_position = Position::new(0, 0);
 	for (position, length, token_type) in tokens {
@@ -117,12 +125,12 @@ pub fn semantic_tokens(scene: MScene, request: SemanticTokensParams)
 	Ok(Some(tokens.into()))
 }
 
-struct Tokens<'a, 'b> {
-	scope: QScope<'a, 'b, 'b>,
-	tokens: &'a mut Vec<(Position, u32, u32)>,
+struct Tokens<'a, 'b, 'c> {
+	scope: QScope<'a, 'b, 'c>,
+	tokens: &'c mut Vec<(Position, u32, u32)>,
 }
 
-impl<'a, 'b> Tokens<'a, 'b> {
+impl<'a, 'b, 'c> Tokens<'a, 'b, 'c> {
 	fn token(&mut self, base: &TSpan, span: &ISpan, token: Token) {
 		if let Span(Some((file, (start, end)))) = TSpan::lift(base, *span) {
 			let position = position(&self.scope.ctx.files, file, start).unwrap();
@@ -138,8 +146,8 @@ impl<'a, 'b> Tokens<'a, 'b> {
 	}
 }
 
-impl<'a, 'b> ReferenceVisitor<'a, 'b> for Tokens<'a, 'b> {
-	fn scope<'c>(&'c mut self) -> QScope<'a, 'b, 'c> { self.scope }
+impl<'a, 'b, 'c> ReferenceVisitor<'a, 'b, 'c> for Tokens<'a, 'b, 'c> {
+	fn scope<'d>(&'d mut self) -> QScope<'a, 'b, 'd> { self.scope }
 
 	fn kind(&mut self, base: &TSpan, kind: &S<HType>) {
 		match kind.node {

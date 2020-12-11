@@ -1,18 +1,18 @@
 use lsp_server::{Message, Request, Response};
 use lsp_types::request;
 
-use super::MScene;
+use super::{LScene, RScene};
 
-pub struct RequestDispatch<'a, 'b>(MScene<'a, 'b>, Option<Request>);
+pub struct RequestDispatch<'a, 'b>(RScene<'a, 'b>, Option<Request>);
 
 impl<'a, 'b> RequestDispatch<'a, 'b> {
-	pub fn new(scene: MScene<'a, 'b>, value: Request) -> Self {
+	pub fn new(scene: RScene<'a, 'b>, value: Request) -> Self {
 		Self(scene, Some(value))
 	}
 
 	#[must_use]
 	pub fn on<R: request::Request, F>(self, function: F) -> Self where
-		F: FnOnce(MScene<'a, '_>, R::Params) -> crate::Result<R::Result> {
+		F: FnOnce(RScene<'a, '_>, R::Params) -> crate::Result<R::Result> {
 		match self {
 			RequestDispatch(_, None) => self,
 			RequestDispatch(scene, Some(request)) => {
@@ -35,17 +35,17 @@ impl<'a, 'b> RequestDispatch<'a, 'b> {
 	pub fn finish(self) {}
 }
 
-pub struct Dispatch<'a, 'b, T>(MScene<'a, 'b>, Option<T>);
+pub struct Dispatch<'a, 'b, T>(LScene<'a, 'b>, Option<T>);
 
 impl<'a, 'b, T> Dispatch<'a, 'b, T> {
-	pub fn new(scene: MScene<'a, 'b>, value: T) -> Self {
+	pub fn new(scene: LScene<'a, 'b>, value: T) -> Self {
 		Self(scene, Some(value))
 	}
 
 	#[must_use]
 	pub fn on<E, P, F>(self, extract: E, function: F) -> Self
 		where E: FnOnce(T) -> Result<P, T>,
-			  F: FnOnce(MScene<'a, '_>, P) {
+			  F: FnOnce(LScene<'a, '_>, P) {
 		match self {
 			Dispatch(_, None) => self,
 			Dispatch(scene, Some(value)) => {

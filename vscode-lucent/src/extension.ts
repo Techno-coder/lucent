@@ -16,10 +16,8 @@ export function activate(_context: ExtensionContext) {
     }
 
     let serverOptions: ServerOptions = {command: path, args: ['server']};
-    let clientOptions: LanguageClientOptions = {
-        documentSelector: [{scheme: 'file', language: 'lucent'}],
-        synchronize: {fileEvents: workspace.createFileSystemWatcher('**/*.lc')}
-    };
+    let documentSelector = [{scheme: 'file', language: 'lucent'}];
+    let clientOptions: LanguageClientOptions = {documentSelector};
 
     let client = new LanguageClient(
         'lucent-server',

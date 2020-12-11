@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::FilePath;
 use crate::node::Path;
 use crate::parse::{ModuleLocation, SymbolTable};
-use crate::query::{E, QScope};
+use crate::query::QScope;
 
 type FileTableEntry = (FilePath, Arc<Path>, Arc<FileTable>);
 
@@ -13,29 +13,29 @@ pub struct FileTable {
 }
 
 impl FileTable {
-	fn find(&self, file: &FilePath) -> Option<Arc<Path>> {
+	fn find(&self, file: &FilePath, base: Arc<Path>,
+			paths: &mut Vec<Arc<Path>>) {
 		for (path, segment, table) in &self.table {
-			if path == file { return Some(segment.clone()); }
-			if let Some(other) = table.find(file) {
-				return Some(segment.append(&other));
-			}
+			let module = base.append(segment);
+			table.find(file, module.clone(), paths);
+			(path == file).then(|| paths.push(module));
 		}
-		None
 	}
 }
 
-/// Returns the module path associated with a
+/// Returns all module paths associated with a
 /// source file. The root path present in the
 /// context must be in its canonical form.
-pub fn file_module(scope: QScope, file: &FilePath)
-				   -> crate::Result<Arc<Path>> {
+pub fn file_modules(scope: QScope, file: &FilePath)
+					-> crate::Result<Vec<Arc<Path>>> {
 	if file == &scope.ctx.root {
-		Ok(Arc::new(Path::Root))
+		Ok(vec![Arc::new(Path::Root)])
 	} else {
-		let path = file_table(scope)?.find(file);
-		path.ok_or_else(|| E::error()
-			.message("file absent from module tree")
-			.label(scope.span.label()).to(scope))
+		let mut paths = Vec::new();
+		let table = file_table(scope)?;
+		let base = Arc::new(Path::Root);
+		table.find(file, base, &mut paths);
+		Ok(paths)
 	}
 }
 

@@ -6,31 +6,33 @@ use crate::node::*;
 use crate::parse::*;
 use crate::query::{ESpan, ISpan, QScope, Span};
 
-use super::{MScene, ReferenceVisitor};
+use super::{ReferenceVisitor, RScene};
 
-pub fn definition(scene: MScene, request: GotoDefinitionParams)
+pub fn definition(scene: RScene, request: GotoDefinitionParams)
 				  -> crate::Result<Option<GotoDefinitionResponse>> {
 	let position = request.text_document_position_params;
 	let file = position.text_document.uri.to_file_path().unwrap();
 	let position = position.position;
-	scope!(scope, scene);
 
-	let module = &super::file_module(scope, &file)?;
-	let symbols = &crate::parse::symbols(scope, module)?;
-	let table = &crate::parse::item_table(scope, module)?;
-
-	let mut visitor = Definitions { scope, locations: vec![], position };
-	super::traverse(&mut visitor, table, symbols);
-	Ok(Some(GotoDefinitionResponse::Array(visitor.locations)))
+	let mut array = Vec::new();
+	let locations = &mut array;
+	scene.modules(&file).iter_mut().map(|(scope, path)| {
+		let scope = &mut scope.span(Span::internal());
+		let symbols = &crate::parse::symbols(scope, path)?;
+		let table = &crate::parse::item_table(scope, path)?;
+		let mut visitor = Definitions { scope, locations, position };
+		crate::Result::Ok(super::traverse(&mut visitor, table, symbols))
+	}).for_each(drop);
+	Ok(Some(GotoDefinitionResponse::Array(array)))
 }
 
-struct Definitions<'a, 'b> {
-	scope: QScope<'a, 'b, 'b>,
-	locations: Vec<Location>,
+struct Definitions<'a, 'b, 'c> {
+	scope: QScope<'a, 'b, 'c>,
+	locations: &'c mut Vec<Location>,
 	position: Position,
 }
 
-impl<'a, 'b> Definitions<'a, 'b> {
+impl<'a, 'b, 'c> Definitions<'a, 'b, 'c> {
 	fn item(&mut self, base: &TSpan, path: &HPath) -> bool {
 		match path {
 			HPath::Root(_) => false,
@@ -56,8 +58,8 @@ impl<'a, 'b> Definitions<'a, 'b> {
 	}
 }
 
-impl<'a, 'b> ReferenceVisitor<'a, 'b> for Definitions<'a, 'b> {
-	fn scope<'c>(&'c mut self) -> QScope<'a, 'b, 'c> { self.scope }
+impl<'a, 'b, 'c> ReferenceVisitor<'a, 'b, 'c> for Definitions<'a, 'b, 'c> {
+	fn scope<'d>(&'d mut self) -> QScope<'a, 'b, 'd> { self.scope }
 
 	fn variable(&mut self, base: &TSpan, value: &Value,
 				parameters: Option<&HVariables>,

@@ -11,26 +11,32 @@ use crate::parse::TSpan;
 use crate::query::{Context, Diagnostic, QScope, Span};
 use crate::source::File;
 
-use super::{MScene, Visitor};
+use super::{RScene, Visitor};
 
-pub fn diagnostics(scene: MScene, path: &FilePath) -> crate::Result<()> {
-	let mut scope = scene.scope();
-	let queries = &mut scope.span(Span::internal());
-	let module = &super::file_module(queries, path)?;
-	let symbols = &crate::parse::symbols(queries, module)?;
-	let table = &crate::parse::item_table(queries, module)?;
+pub fn diagnostics(scene: RScene, file: &FilePath) -> crate::Result<()> {
+	let mut diagnostics = Vec::new();
+	let uri = Url::from_file_path(file).unwrap();
+	for (mut scope, path) in scene.modules(file) {
+		let queries = &mut scope.span(Span::internal());
+		let symbols = &crate::parse::symbols(queries, &path)?;
+		let table = &crate::parse::item_table(queries, &path)?;
 
-	let ctx = queries.ctx;
-	let diagnostics = &mut Diagnostics(queries);
-	super::traverse(diagnostics, table, symbols);
-	let errors = ctx.errors(scope).into_iter();
+		let ctx = queries.ctx;
+		let visitor = &mut Diagnostics(queries);
+		super::traverse(visitor, table, symbols);
+		let errors = ctx.errors(scope).into_iter();
 
-	let ctx = scene.ctx;
-	scope!(scope, scene);
-	let uri = Url::from_file_path(path).unwrap();
-	let diagnostics = errors.into_iter()
-		.filter_map(|error| encode(ctx, error.lift(scope)))
-		.collect();
+		let scope = &mut scene.scope(ctx);
+		let scope = &mut scope.span(Span::internal());
+		diagnostics.extend(errors.into_iter().filter_map(|error|
+			encode(ctx, error.lift(scope))));
+	}
+
+	// Sort and remove duplicate diagnostics.
+	// Duplicates arise from multiple targets.
+	diagnostics.sort_by_cached_key(|value|
+		serde_json::to_vec(value).unwrap());
+	diagnostics.dedup();
 
 	let publish = PublishDiagnosticsParams { uri, diagnostics, version: None };
 	Ok(super::send_notification::<PublishDiagnostics>(scene, publish))
@@ -43,10 +49,10 @@ pub fn file_location(ctx: &Context, file: File, range: Range<usize>) -> Location
 	Location { uri: path, range }
 }
 
-struct Diagnostics<'a, 'b>(QScope<'a, 'b, 'b>);
+struct Diagnostics<'a, 'b, 'c>(QScope<'a, 'b, 'c>);
 
-impl<'a, 'b> Visitor<'a, 'b> for Diagnostics<'a, 'b> {
-	fn scope<'c>(&'c mut self) -> QScope<'a, 'b, 'c> {
+impl<'a, 'b, 'c> Visitor<'a, 'b, 'c> for Diagnostics<'a, 'b, 'c> {
+	fn scope<'d>(&'d mut self) -> QScope<'a, 'b, 'd> {
 		let Self(scope) = self;
 		scope
 	}

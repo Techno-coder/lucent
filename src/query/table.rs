@@ -10,6 +10,7 @@ use super::*;
 #[derive(Debug)]
 pub enum QueryError {
 	Cycle(Vec<(ESpan, Key)>),
+	Cancelled,
 	Failure,
 }
 
@@ -24,7 +25,7 @@ impl<K: QueryKey> Table<K> {
 	pub fn scope<P>(&self, scope: QScope, key: impl Into<K>,
 					provide: P) -> Result<Arc<K::Value>, QueryError>
 		where P: FnOnce(MScope) -> Result<Arc<K::Value>, QueryError> {
-		if scope.cancelled() { return Err(QueryError::Failure); }
+		if scope.cancelled() { return Err(QueryError::Cancelled); }
 		let key: K = key.into();
 
 		// Add this query as a dependency of the parent query.
@@ -58,8 +59,8 @@ impl<K: QueryKey> Table<K> {
 								scope.handle, Some(key.clone().into()));
 							match provide(&mut scoped) {
 								Ok(value) => Ok(value),
-								Err(QueryError::Failure) =>
-									Err(QueryError::Failure),
+								Err(QueryError::Failure) => Err(QueryError::Failure),
+								Err(QueryError::Cancelled) => Err(QueryError::Cancelled),
 								Err(QueryError::Cycle(mut keys)) => {
 									keys.push((scope.span.clone(), key.into()));
 									Err(QueryError::Cycle(keys))
@@ -79,7 +80,7 @@ impl<K: QueryKey> Table<K> {
 				let mut result = provide(&mut scoped);
 				let cancelled = || match scope.cancelled() {
 					false => panic!("table invalidation before cancellation"),
-					true => Err(QueryError::Failure),
+					true => Err(QueryError::Cancelled),
 				};
 
 				match self.table.entry(key.clone()) {
@@ -97,7 +98,7 @@ impl<K: QueryKey> Table<K> {
 								// Entry has not been mutated since
 								// this query has started.
 								let _ = lock.remove();
-								Err(QueryError::Failure)
+								cancelled()
 							} else {
 								match &mut result {
 									Ok(value) => entry.kind =
@@ -107,6 +108,10 @@ impl<K: QueryKey> Table<K> {
 									Err(QueryError::Cycle(keys)) => {
 										entry.kind = EntryKind::Failure;
 										keys.push((scope.span.clone(), key.into()));
+									}
+									Err(QueryError::Cancelled) => {
+										let _ = lock.remove();
+										return cancelled();
 									}
 								}
 

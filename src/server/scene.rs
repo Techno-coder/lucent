@@ -1,46 +1,51 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use lsp_server::Connection;
+use parking_lot::RwLock;
 
 use crate::FilePath;
-use crate::query::{Context, Key, Scope, ScopeHandle};
+use crate::node::Path;
+use crate::query::{Context, Scope, ScopeHandle, Span};
 
-pub type MScene<'a, 'b> = &'b mut Scene<'a>;
+pub type LScene<'a, 'b> = &'b RwLock<Scene<'a>>;
+pub type RScene<'a, 'b> = &'b Scene<'a>;
 
 pub struct Scene<'a> {
-	pub ctx: &'a Context,
 	pub connection: &'a Connection,
+	pub workspace: Option<FilePath>,
+	pub handle: ScopeHandle,
 	pub watched: HashSet<FilePath>,
-	scopes: Vec<ScopeHandle>,
+	pub unlinked: HashMap<FilePath, Context>,
+	pub targets: Vec<Context>,
 }
 
 impl<'a> Scene<'a> {
-	pub fn new(ctx: &'a Context, connection: &'a Connection) -> Self {
-		Self { ctx, connection, watched: HashSet::new(), scopes: vec![] }
+	pub fn new(connection: &'a Connection,
+			   workspace: Option<FilePath>) -> Self {
+		Scene {
+			workspace,
+			connection,
+			watched: HashSet::new(),
+			handle: ScopeHandle::default(),
+			unlinked: HashMap::new(),
+			targets: vec![],
+		}
 	}
 
-	pub fn scope(&mut self) -> Scope {
-		self.scopes.push(ScopeHandle::default());
-		let handle: &ScopeHandle = self.scopes.last().unwrap();
-		Scope::root(self.ctx, Some(handle))
+	pub fn scope(&'a self, ctx: &'a Context) -> Scope<'a> {
+		Scope::root(ctx, Some(&self.handle))
 	}
 
-	pub fn cancel(&mut self) {
-		self.scopes.drain(..).for_each(|scope| scope.cancel());
+	pub fn scopes(&self, path: &FilePath) -> Vec<Scope> {
+		let (targets, unlinked) = (self.targets.iter(), self.unlinked.get(path));
+		Iterator::chain(targets, unlinked).map(|ctx| self.scope(ctx)).collect()
 	}
 
-	pub fn invalidate(&mut self, key: &Key) {
-		self.cancel();
-		self.ctx.invalidate(key);
+	pub fn modules(&self, path: &FilePath) -> Vec<(Scope, Arc<Path>)> {
+		let (targets, unlinked) = (self.targets.iter(), self.unlinked.get(path));
+		Iterator::chain(targets, unlinked).map(|ctx| super::file_modules(&mut
+			self.scope(ctx).span(Span::internal()), path).into_iter().flatten()
+			.map(move |path| (self.scope(ctx), path))).flatten().collect()
 	}
 }
-
-/// Convenience macro for constructing a `QScope`.
-macro_rules! scope {
-    ($scope:ident, $scene:expr) => {
-    	let mut scope = $scene.scope();
-    	let span = crate::query::Span::internal();
-		let $scope = &mut scope.span(span);
-    };
-}
-
