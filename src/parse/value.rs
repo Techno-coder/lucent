@@ -49,20 +49,19 @@ impl<'a, 'b> DerefMut for Scene<'a, 'b> {
 /// `Result` as any errors are replaced with `HNode::Error`.
 pub fn valued<'a>(scope: MScope, scene: &mut super::Scene,
 				  span: &TSpan, node: impl Node<'a>) -> VIndex {
-	value_frame(scope, scene, span, &HVariables::new(), node)
+	let value = value_frame(scope, scene,
+		span, &HVariables::new(), node);
+	scene.values.insert(value)
 }
 
 pub fn value_frame<'a>(scope: MScope, scene: &mut super::Scene, span: &TSpan,
-					   parameters: &HVariables, node: impl Node<'a>) -> VIndex {
-	let value = Value::new(|value| {
+					   parameters: &HVariables, node: impl Node<'a>) -> Value {
+	Value::new(|value| {
 		let frames = vec![HashMap::from_iter(parameters
 			.keys().map(|key| (key.clone(), 0)))];
 		let scene = &mut Scene { frames, scene, value };
 		self::value(scope, scene, span, &node)
-	});
-
-	let values = &mut scene.values;
-	values.insert(value)
+	})
 }
 
 fn value<'a>(scope: MScope, scene: &mut Scene,

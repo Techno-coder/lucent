@@ -13,8 +13,18 @@ pub type PStatic = Universal<HStatic, HLoadStatic>;
 
 #[derive(Debug)]
 pub enum Universal<V, L> {
-	Local(V),
-	Load(L),
+	Local(Arc<V>),
+	Load(Arc<L>),
+}
+
+impl<V, L> Clone for Universal<V, L> {
+	fn clone(&self) -> Self {
+		use Universal::*;
+		match self {
+			Local(local) => Local(local.clone()),
+			Load(load) => Load(load.clone()),
+		}
+	}
 }
 
 impl PFunction {
@@ -33,9 +43,9 @@ impl PFunction {
 pub struct ItemTable {
 	pub module: Arc<HModule>,
 	pub modules: HashMap<Identifier, Arc<ItemTable>>,
-	pub functions: HashMap<Identifier, Arc<Vec<Arc<PFunction>>>>,
+	pub functions: HashMap<Identifier, Arc<Vec<PFunction>>>,
 	pub structures: HashMap<Identifier, Arc<HData>>,
-	pub statics: HashMap<Identifier, Arc<PStatic>>,
+	pub statics: HashMap<Identifier, PStatic>,
 	pub libraries: HashMap<Identifier, Arc<HLibrary>>,
 	pub roots: Vec<(Identifier, FIndex)>,
 	pub inclusions: Arc<Inclusions>,
@@ -57,12 +67,20 @@ impl ItemTable {
 	}
 }
 
-pub fn function(scope: QScope, FPath(path, index): &FPath) -> crate::Result<Arc<PFunction>> {
+pub fn local(scope: QScope, FLocal(path): &FLocal)
+			 -> crate::Result<Arc<HFunction>> {
+	match self::function(scope, path)? {
+		PFunction::Local(local) => Ok(local.clone()),
+		_ => panic!("function: {}, is not local", path),
+	}
+}
+
+pub fn function(scope: QScope, FPath(path, index): &FPath) -> crate::Result<PFunction> {
 	Ok(functions(scope, path)?.get(*index).cloned().unwrap_or_else(||
 		panic!("function: {}, index: {}, does not exist", path, index)))
 }
 
-pub fn functions(scope: QScope, path: &Path) -> crate::Result<Arc<Vec<Arc<PFunction>>>> {
+pub fn functions(scope: QScope, path: &Path) -> crate::Result<Arc<Vec<PFunction>>> {
 	scope.ctx.functions.inherit(scope, path.clone(), |scope| match path {
 		Path::Root => panic!("invalid function path: {}", path),
 		Path::Node(module, identifier) => {
@@ -86,7 +104,7 @@ pub fn statics(scope: QScope, path: &Path) -> crate::Result<Arc<PStatic>> {
 			let statics = &item_table(scope, module)?.statics;
 			statics.get(identifier).cloned().ok_or_else(|| E::error()
 				.message(format!("undefined static variable: {}", path))
-				.label(scope.span.label()).to(scope))
+				.label(scope.span.label()).to(scope)).map(Arc::new)
 		}
 	})
 }
@@ -151,7 +169,7 @@ pub fn value(scope: QScope, VPath(symbol, index): &VPath) -> crate::Result<Arc<V
 			PStatic::Local(local) => store(&local.values),
 			PStatic::Load(load) => store(&load.values),
 		}
-		Symbol::Function(path) => match function(scope, path)?.as_ref() {
+		Symbol::Function(path) => match function(scope, path)? {
 			PFunction::Local(local) => store(&local.values),
 			PFunction::Load(load) => store(&load.values),
 		}

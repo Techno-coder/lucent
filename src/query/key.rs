@@ -1,9 +1,8 @@
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::sync::Arc;
 
 use crate::FilePath;
-use crate::node::{Path, VPath};
+use crate::node::{Path, VPath, FLocal};
 
 pub trait QueryKey: Debug + Clone + Hash + Eq + PartialEq + Into<Key> {
 	type Value: Debug;
@@ -57,11 +56,14 @@ queries! {
 
 	ItemTable(Path) -> crate::parse::ItemTable;
 	GlobalAnnotations(()) -> crate::node::GlobalAnnotations;
-	Functions(Path) -> Vec<Arc<crate::parse::PFunction>>;
+	Functions(Path) -> Vec<crate::parse::PFunction>;
 	Static(Path) -> crate::parse::PStatic;
 	Structure(Path) -> crate::node::HData;
 	Library(Path) -> crate::node::HLibrary;
 	Module(Path) -> crate::node::HModule;
 
 	Types(VPath) -> crate::inference::Types;
+	TypesFunction(FLocal) -> crate::inference::Types;
+	LowFunction(FLocal) -> crate::node::LFunction;
+	Low(VPath) -> crate::node::LNode;
 }

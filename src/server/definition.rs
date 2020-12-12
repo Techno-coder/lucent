@@ -97,7 +97,7 @@ impl<'a, 'b, 'c> ReferenceVisitor<'a, 'b, 'c> for Definitions<'a, 'b, 'c> {
 		if !self.item(base, path) { return; }
 		let path = FPath(path.path(), index);
 		let target = crate::parse::function(self.scope, &path);
-		let target = match target.unwrap().as_ref() {
+		let target = match target.unwrap() {
 			Universal::Local(local) => local.name.span,
 			Universal::Load(load) => load.name.span,
 		};
@@ -164,13 +164,11 @@ impl<'a, 'b, 'c> ReferenceVisitor<'a, 'b, 'c> for Definitions<'a, 'b, 'c> {
 				let path = path.path();
 				let targets = crate::parse::functions(self.scope, &path);
 				for (index, target) in targets.unwrap().iter().enumerate() {
-					let target = match target.as_ref() {
+					let symbol = Symbol::Function(FPath(path.clone(), index));
+					let target = ESpan::Item(symbol, match target {
 						Universal::Local(local) => local.name.span,
 						Universal::Load(load) => load.name.span,
-					};
-
-					let symbol = Symbol::Function(FPath(path.clone(), index));
-					let target = ESpan::Item(symbol, target).lift(self.scope);
+					}).lift(self.scope);
 					self.location(target);
 				}
 			}

@@ -6,7 +6,7 @@ use lsp_types::*;
 use lsp_types::notification::PublishDiagnostics;
 
 use crate::FilePath;
-use crate::node::{HVariables, Value, VPath};
+use crate::node::{FLocal, HFunction, Value, VPath};
 use crate::parse::TSpan;
 use crate::query::{Context, Diagnostic, QScope, Span};
 use crate::source::File;
@@ -57,8 +57,11 @@ impl<'a, 'b, 'c> Visitor<'a, 'b, 'c> for Diagnostics<'a, 'b, 'c> {
 		scope
 	}
 
-	fn value(&mut self, _: &TSpan, path: VPath,
-			 _: &Value, _: Option<&HVariables>) {
+	fn function(&mut self, _: &TSpan, path: &FLocal, _: &HFunction) {
+		let _ = crate::inference::function(self.scope(), &path);
+	}
+
+	fn value(&mut self, _: &TSpan, path: VPath, _: &Value) {
 		let _ = crate::inference::types(self.scope(), &path);
 	}
 }

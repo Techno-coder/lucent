@@ -160,7 +160,7 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 								kind,
 							};
 
-							let entry = Arc::new(PStatic::Load(load));
+							let entry = PStatic::Load(Arc::new(load));
 							table.statics.insert(identifier, entry);
 						}
 						"signature" => {
@@ -183,7 +183,7 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 							};
 
 							let entry = Arc::get_mut(entry).unwrap();
-							entry.push(Arc::new(PFunction::Load(function)));
+							entry.push(PFunction::Load(Arc::new(function)));
 						}
 						_ => symbol.invalid(scope)?,
 					}
@@ -210,7 +210,7 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 
 			let entry = Arc::get_mut(entry).unwrap();
 			let function = HFunction { values, annotations, name, signature, value };
-			entry.push(Arc::new(PFunction::Local(function)));
+			entry.push(PFunction::Local(Arc::new(function)));
 		}
 		"data" => {
 			let mut values = VStore::default();
@@ -242,7 +242,7 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 			let name = node.identifier_span(scope, span)?;
 			let annotations = annotations(scope, scene, span, &node)?;
 			let statics = HStatic { values, annotations, name, kind, value };
-			table.statics.insert(identifier, Arc::new(PStatic::Local(statics)));
+			table.statics.insert(identifier, PStatic::Local(Arc::new(statics)));
 		}
 		"annotation" => {
 			let module = Arc::get_mut(&mut table.module).unwrap();

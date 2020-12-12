@@ -10,7 +10,6 @@ use super::{E, key, Key, Scope, Table};
 /// `Context`s cannot be shared between
 /// compilation targets as two different items
 /// may resolve to the same path.
-// TODO: generate Context from macro
 #[derive(Debug, Default)]
 pub struct Context {
 	pub root: FilePath,
@@ -26,6 +25,9 @@ pub struct Context {
 	pub library: Table<key::Library>,
 	pub module: Table<key::Module>,
 	pub types: Table<key::Types>,
+	pub typed: Table<key::TypesFunction>,
+	pub lower: Table<key::LowFunction>,
+	pub low: Table<key::Low>,
 }
 
 impl Context {
@@ -56,6 +58,9 @@ impl Context {
 			Key::Library(key) => self.library.errors(key),
 			Key::Module(key) => self.module.errors(key),
 			Key::Types(key) => self.types.errors(key),
+			Key::TypesFunction(key) => self.typed.errors(key),
+			Key::LowFunction(key) => self.lower.errors(key),
+			Key::Low(key) => self.low.errors(key),
 		};
 
 		match visited.contains(&key) {
@@ -83,6 +88,9 @@ impl Context {
 			Key::Library(key) => self.library.invalidate(key),
 			Key::Module(key) => self.module.invalidate(key),
 			Key::Types(key) => self.types.invalidate(key),
+			Key::TypesFunction(key) => self.typed.invalidate(key),
+			Key::LowFunction(key) => self.lower.invalidate(key),
+			Key::Low(key) => self.low.invalidate(key),
 		}.iter().for_each(|key| self.invalidate(key))
 	}
 }

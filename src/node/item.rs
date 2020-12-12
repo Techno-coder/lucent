@@ -40,6 +40,23 @@ impl fmt::Display for FPath {
 	}
 }
 
+/// Identifies a local function.
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub struct FLocal(pub FPath);
+
+impl AsRef<FPath> for FLocal {
+	fn as_ref(&self) -> &FPath {
+		let FLocal(path) = self;
+		path
+	}
+}
+
+impl fmt::Display for FLocal {
+	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+		write!(f, "{}", self.as_ref())
+	}
+}
+
 /// Uniquely references an item.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub enum Symbol {
@@ -119,9 +136,10 @@ pub enum LoadReference {
 }
 
 /// References the address of a function call.
-pub enum Receiver<I> {
+#[derive(Debug)]
+pub enum Receiver<N> {
 	Path(S<FPath>),
-	Method(Convention, I),
+	Method(Convention, N),
 }
 
 #[derive(Debug, Clone, PartialEq)]

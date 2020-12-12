@@ -13,12 +13,14 @@ pub struct HIndex(usize);
 /// meaning all nodes referenced are within the value.
 #[derive(Debug, PartialEq)]
 pub struct Value {
+	/// The index of root node of this value.
 	pub root: HIndex,
 	nodes: Vec<S<HNode>>,
 }
 
 impl Value {
-	pub fn new<F>(function: F) -> Self where F: FnOnce(&mut Self) -> HIndex {
+	pub fn new<F>(function: F) -> Self
+		where F: FnOnce(&mut Self) -> HIndex {
 		let (root, nodes) = (HIndex(0), Vec::new());
 		let mut value = Self { root, nodes };
 		value.root = function(&mut value);

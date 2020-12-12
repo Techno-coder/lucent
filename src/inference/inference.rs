@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use crate::node::*;
-use crate::parse::{PFunction, PStatic, Universal};
+use crate::parse::{PStatic, Universal};
 use crate::query::{IScope, ItemScope, QScope, S};
 
 use super::{IType, Scene};
@@ -12,6 +12,29 @@ pub struct Types {
 	pub nodes: HashMap<HIndex, S<RType>>,
 	pub variables: HashMap<Variable, S<RType>>,
 	pub functions: HashMap<HIndex, FIndex>,
+}
+
+/// Infers the types in a function root value.
+/// The referenced function must be local.
+pub fn function(scope: QScope, path: &FLocal)
+				-> crate::Result<Arc<Types>> {
+	scope.ctx.typed.inherit(scope, path.clone(), |scope| {
+		let local = crate::parse::local(scope, path)?;
+		let symbol = Symbol::Function(path.as_ref().clone());
+		let scope = &mut ItemScope::new(scope, symbol.clone());
+		let hint = lift(scope, &local.signature.return_type)?;
+
+		let mut types = Types::default();
+		for (name, (_, kind)) in &local.signature.parameters {
+			let variable = Variable(name.clone(), 0);
+			types.variables.insert(variable, lift(scope, kind)?);
+		}
+
+		let (value, return_type) = (&local.value, Some(hint.clone()));
+		let mut scene = Scene { scope, return_type, value, types };
+		super::check(&mut scene, &value.root, super::raise(hint));
+		Ok(Arc::new(scene.types))
+	})
 }
 
 /// Infers the types in a value. See `hint`
@@ -44,36 +67,18 @@ pub fn types(scope: QScope, path: &VPath)
 /// the query depends on the entire item so this
 /// remains valid on item invalidations. However,
 /// as a consequence, functions invoking this query
-/// must be careful to invoke the dependent queries
+/// must be careful to invoke dependent queries
 /// first or else types in compile time contexts
 /// may remain erroneously unresolved.
 pub fn hint(scope: QScope, path: &VPath,
 			hint: Option<IType>) -> crate::Result<Arc<Types>> {
 	scope.ctx.types.inherit(scope, path.clone(), |scope| {
 		let value = crate::parse::value(scope, path)?;
-		let mut types = Types::default();
-		let mut return_type = None;
-
-		// Populate function types.
-		let VPath(symbol, index) = path;
-		if let Symbol::Function(function) = symbol {
-			let function = crate::parse::function(scope, function)?;
-			if let PFunction::Local(local) = function.as_ref() {
-				if index == &local.value {
-					let scope = &mut ItemScope::path(scope, path.clone());
-					return_type = Some(lift(scope, &local.signature.return_type)?);
-					for (name, (_, kind)) in &local.signature.parameters {
-						let variable = Variable(name.clone(), 0);
-						types.variables.insert(variable, lift(scope, kind)?);
-					}
-				}
-			}
-		}
-
-		let value = value.as_ref();
 		let scope = &mut ItemScope::path(scope, path.clone());
-		let mut scene = Scene { scope, return_type, value, types };
-		match Option::or(hint, scene.return_type.clone().map(super::raise)) {
+		let (types, value) = (Types::default(), value.as_ref());
+		let mut scene = Scene { scope, return_type: None, value, types };
+
+		match hint {
 			Some(hint) => super::check(&mut scene, &value.root, hint),
 			None => drop(super::synthesize(&mut scene, &value.root)),
 		}

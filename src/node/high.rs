@@ -46,7 +46,11 @@ pub struct HFunction {
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
 	pub signature: HSignature,
-	pub value: VIndex,
+	/// The root value for this function.
+	/// This is not stored with a `VIndex` as
+	/// queries on this value must handle the
+	/// existence of function parameters.
+	pub value: Value,
 }
 
 #[derive(Debug, PartialEq)]

@@ -2,7 +2,14 @@ use crate::query::S;
 
 use super::*;
 
-pub type LReceiver = Receiver<LIndex>;
+pub type LReceiver = Receiver<BNode>;
+pub type LNode = S<LowNode>;
+type BNode = Box<LNode>;
+
+#[derive(Debug)]
+pub struct LFunction {
+	pub node: LNode,
+}
 
 /// A lower variant of `HNode` that is
 /// amenable to code generation. Used in lowering
@@ -12,23 +19,25 @@ pub type LReceiver = Receiver<LIndex>;
 /// Type information is not preserved.
 /// Control flow statements such as `continue`
 /// and `break` must be valid at their position.
-// TODO: add Compile and Inline
 #[derive(Debug)]
-pub enum LNode {
-	Block(Vec<LIndex>),
+pub enum LowNode {
+	Block(Vec<LNode>),
 	Let(S<LTarget>, S<Size>),
 	LetZero(S<LTarget>, S<Size>),
-	Set(LIndex, LIndex),
-	Loop(LIndex),
-	When(Vec<(LIndex, LIndex)>),
-	Cast(LIndex, S<Width>),
-	Return(LIndex),
-	Call(LReceiver, Vec<LIndex>),
-	Offset(LIndex, S<usize>),
-	Binary(LBinary, Width, LIndex, LIndex),
-	Unary(Unary, Width, LIndex),
+	Set(BNode, BNode),
+	Loop(BNode),
+	If(BNode, BNode, Option<BNode>),
+	Cast(BNode, S<Width>),
+	Return(BNode),
+	Call(LReceiver, Vec<LNode>),
+	Offset(BNode, S<usize>),
+	Binary(LBinary, Width, BNode, BNode),
+	Unary(Unary, Width, BNode),
+	Compile(VPath),
+	Inline(VPath),
 	Target(S<LTarget>),
-	Path(Path),
+	Function(FPath),
+	Static(Path),
 	String(String),
 	Register(Identifier),
 	Integral(i128),
