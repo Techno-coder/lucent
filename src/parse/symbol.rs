@@ -196,8 +196,7 @@ fn item<'a>(scope: MScope, path: &FilePath, table: &mut SymbolTable,
 fn import<'a>(scope: MScope, table: &mut SymbolTable, path: &FilePath,
 			  node: impl Node<'a>) -> crate::Result<()> {
 	Ok(if let Some(other) = node.attribute("path") {
-		let range = 1..other.text().len() - 1;
-		let path = path.parent().unwrap().join(&other.text()[range]);
+		let path = path.parent().unwrap().join(other.string());
 		let name = node.attribute("name").as_ref().map(Node::text);
 		let stem = path.file_stem().and_then(|name| name.to_str());
 		let name = name.or(stem).ok_or_else(|| E::error()

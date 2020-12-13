@@ -160,8 +160,8 @@ fn kind<'a: 'b, 'b: 'c, 'c>(visitor: &mut impl ReferenceVisitor<'a, 'b, 'c>,
 	match &kind.node {
 		HType::Structure(path) => visitor.structure(base, path),
 		HType::Function(kind) => signature(visitor, base, kind),
-		HType::Pointer(kind) => self::kind(visitor, base, kind),
-		HType::Slice(kind) => self::kind(visitor, base, kind),
+		HType::Pointer(_, kind) => self::kind(visitor, base, kind),
+		HType::Slice(_, kind) => self::kind(visitor, base, kind),
 		HType::Array(kind, _) => self::kind(visitor, base, kind),
 		_ => (),
 	}

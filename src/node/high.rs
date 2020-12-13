@@ -7,11 +7,11 @@ use crate::query::{ISpan, S, Span};
 
 use super::*;
 
-pub type GlobalAnnotations = HashMap<Identifier, HGlobalAnnotation>;
 pub type HAnnotations = HashMap<Identifier, (ISpan, VIndex)>;
+pub type GlobalAnnotations = HashMap<Identifier, HGlobalAnnotation>;
+pub type HType = Type<HPath, HSignature, VIndex, Option<S<Target>>>;
 pub type HVariables = IndexMap<Identifier, (ISpan, S<HType>)>;
 pub type HFields = IndexMap<Identifier, (ISpan, HIndex)>;
-pub type HType = Type<HPath, HSignature, VIndex>;
 
 #[derive(Debug)]
 pub struct HModule {
@@ -46,15 +46,12 @@ pub struct HFunction {
 	pub annotations: HAnnotations,
 	pub name: S<Identifier>,
 	pub signature: HSignature,
-	/// The root value for this function.
-	/// This is not stored with a `VIndex` as
-	/// queries on this value must handle the
-	/// existence of function parameters.
 	pub value: Value,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct HSignature {
+	pub target: Option<S<Target>>,
 	pub convention: Convention,
 	pub parameters: HVariables,
 	pub return_type: S<HType>,

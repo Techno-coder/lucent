@@ -6,12 +6,14 @@ use crate::query::S;
 use super::Path;
 
 pub type Register = Identifier;
+/// The target architecture for an item.
+pub type Target = Identifier;
 /// The calling convention for a function or call.
 pub type Convention = Option<S<Identifier>>;
 /// The overload index for functions with the same path.
 pub type FIndex = usize;
 /// A fully resolved and evaluated type.
-pub type RType = Type<Arc<Path>, Signature, usize>;
+pub type RType = Type<Arc<Path>, Signature, usize, Option<Target>>;
 
 #[derive(Debug, Clone, Hash, Ord, PartialOrd, Eq, PartialEq)]
 pub struct Identifier(pub Arc<str>);
@@ -48,12 +50,6 @@ impl AsRef<FPath> for FLocal {
 	fn as_ref(&self) -> &FPath {
 		let FLocal(path) = self;
 		path
-	}
-}
-
-impl fmt::Display for FLocal {
-	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		write!(f, "{}", self.as_ref())
 	}
 }
 
@@ -144,16 +140,18 @@ pub enum Receiver<N> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Signature {
-	pub convention: Option<S<Identifier>>,
+	pub target: Option<Target>,
+	pub convention: Convention,
 	pub parameters: Vec<S<RType>>,
 	pub return_type: S<RType>,
 }
 
 impl fmt::Display for Signature {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		if let Some(convention) = &self.convention {
-			write!(f, "{} ", convention.node)?;
-		}
+		self.target.iter().try_for_each(|target|
+			write!(f, "\"{}\" ", target))?;
+		self.convention.iter().try_for_each(|convention|
+			write!(f, "\"{}\" ", convention.node))?;
 
 		write!(f, "fn(")?;
 		if let Some((last, parameters)) = self.parameters.split_last() {
@@ -167,7 +165,7 @@ impl fmt::Display for Signature {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Type<P, F, V> {
+pub enum Type<P, F, V, T> {
 	Void,
 	Rune,
 	Truth,
@@ -175,10 +173,10 @@ pub enum Type<P, F, V> {
 	Structure(P),
 	Integral(Sign, Width),
 	IntegralSize(Sign),
-	Pointer(Box<S<Self>>),
 	Function(Box<F>),
+	Pointer(T, Box<S<Self>>),
+	Slice(T, Box<S<Self>>),
 	Array(Box<S<Self>>, V),
-	Slice(Box<S<Self>>),
 }
 
 impl fmt::Display for RType {
@@ -191,10 +189,19 @@ impl fmt::Display for RType {
 			Type::Structure(path) => write!(f, "{}", path),
 			Type::Integral(sign, width) => write!(f, "{}{}", sign, width),
 			Type::IntegralSize(sign) => write!(f, "{}size", sign),
-			Type::Pointer(kind) => write!(f, "*{}", kind.node),
 			Type::Function(signature) => write!(f, "{}", signature),
-			Type::Array(kind, size) => write!(f, "[{}; {}]", kind.node, size),
-			Type::Slice(kind) => write!(f, "[{};]", kind.node),
+			Type::Array(kind, size) =>
+				write!(f, "[{}; {}]", kind.node, size),
+			Type::Pointer(target, kind) => {
+				target.iter().try_for_each(|target|
+					write!(f, "\"{}\" ", target))?;
+				write!(f, "*{}", kind.node)
+			}
+			Type::Slice(target, kind) => {
+				target.iter().try_for_each(|target|
+					write!(f, "\"{}\" ", target))?;
+				write!(f, "[{};]", kind.node)
+			}
 		}
 	}
 }

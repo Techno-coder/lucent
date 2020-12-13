@@ -113,17 +113,27 @@ module.exports = grammar({
         ),
 
         signature: $ => signature($, true),
-        signature_type: $ => prec.right(signature($, false)),
+        signature_type: $ => prec.right(seq(
+            optional(field('target', $.string)),
+            signature($, false),
+        )),
 
-        pointer: $ => seq('*', field('type', $._type)),
-        slice_type: $ => seq('[', field('type', $._type), ';]'),
+        pointer: $ => seq(
+            optional(field('target', $.string)),
+            '*', field('type', $._type)
+        ),
+
+        slice_type: $ => seq(
+            optional(field('target', $.string)),
+            '[', field('type', $._type), ';]'
+        ),
+
         array_type: $ => seq(
             '[', field('type', $._type),
             ';', field('size', $._value), ']',
         ),
 
         block: $ => enclose($, $._statement),
-
         _statement: $ => prec.right(choice(
             alias('break', $.break),
             alias('continue', $.continue),

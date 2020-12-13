@@ -106,7 +106,7 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 			match module.kind() {
 				"string" => {
 					// TODO: implement C header loading
-					let path = module.text().into();
+					let path = module.string().into();
 					let mut values = VStore::default();
 					let identifier = node.identifier(scope)?;
 					let span = &symbols.libraries[&identifier];
@@ -279,6 +279,7 @@ pub fn path<'a>(scope: MScope, span: &TSpan,
 pub fn signature<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 					 node: &impl Node<'a>) -> crate::Result<HSignature> {
 	Ok(HSignature {
+		target: super::target(span, node),
 		convention: node.attribute("convention").map(|node|
 			S::new(Identifier(node.text().into()), node.offset(span))),
 		parameters: super::variables(scope, scene, span, node)?,

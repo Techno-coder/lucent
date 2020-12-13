@@ -1,1 +1,3 @@
-pub mod relation;
+pub use target::*;
+
+mod target;

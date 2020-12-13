@@ -2541,6 +2541,16 @@
     "type": "pointer",
     "named": true,
     "fields": {
+      "target": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
       "type": {
         "multiple": false,
         "required": true,
@@ -2933,6 +2943,16 @@
             "named": true
           }
         ]
+      },
+      "target": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
       }
     },
     "children": {
@@ -3202,6 +3222,16 @@
     "type": "slice_type",
     "named": true,
     "fields": {
+      "target": {
+        "multiple": false,
+        "required": false,
+        "types": [
+          {
+            "type": "string",
+            "named": true
+          }
+        ]
+      },
       "type": {
         "multiple": false,
         "required": true,

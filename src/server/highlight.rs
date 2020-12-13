@@ -151,9 +151,9 @@ impl<'a, 'b, 'c> ReferenceVisitor<'a, 'b, 'c> for Tokens<'a, 'b, 'c> {
 
 	fn kind(&mut self, base: &TSpan, kind: &S<HType>) {
 		match kind.node {
-			HType::Pointer(_) => return,
+			HType::Pointer(_, _) => return,
 			HType::Structure(_) | HType::Function(_) => return,
-			HType::Array(_, _) | HType::Slice(_) => return,
+			HType::Array(_, _) | HType::Slice(_, _) => return,
 			_ => self.token(base, &kind.span, Token::Type),
 		}
 	}

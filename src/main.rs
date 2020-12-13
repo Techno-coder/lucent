@@ -10,7 +10,7 @@ mod node;
 mod compile;
 mod query;
 mod parse;
-// mod analysis;
+mod analysis;
 mod inference;
 mod interface;
 mod source;

@@ -211,6 +211,25 @@ fn function()
 			(identifier)) (arguments)))))
 
 =====================================
+Target pointers
+=====================================
+
+fn function()
+	let pointer: "target" *u8
+	let pointer: "target" [u8;]
+	let pointer: "target" fn()
+
+---
+
+(source (function
+	(identifier) (block
+		(let (identifier) (pointer
+			(string) (path (identifier))))
+		(let (identifier) (slice_type
+			(string) (path (identifier))))
+		(let (identifier) (signature_type (string))))))
+
+=====================================
 If expressions
 =====================================
 

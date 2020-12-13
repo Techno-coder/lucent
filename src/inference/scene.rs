@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::node::{HType, RType, Sign, Value};
+use crate::node::{HType, RType, Sign, Target, Value};
 use crate::query::{E, IScope, ISpan, S};
 
 use super::Types;
@@ -11,7 +11,7 @@ pub const INDEX: IType = index();
 #[derive(Debug, Clone)]
 pub enum IType {
 	Type(S<RType>),
-	Sequence(S<RType>),
+	Sequence(Option<Target>, S<RType>),
 	IntegralSize,
 }
 
@@ -19,7 +19,7 @@ impl IType {
 	pub fn span(&self) -> ISpan {
 		match self {
 			IType::Type(node) => node.span,
-			IType::Sequence(node) => node.span,
+			IType::Sequence(_, node) => node.span,
 			IType::IntegralSize => ISpan::internal(),
 		}
 	}
@@ -29,8 +29,12 @@ impl fmt::Display for IType {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
 		match self {
 			IType::Type(kind) => write!(f, "{}", kind.node),
-			IType::Sequence(kind) => write!(f, "[{}; ?]", kind.node),
 			IType::IntegralSize => write!(f, "<size>"),
+			IType::Sequence(target, kind) => {
+				target.iter().try_for_each(|target|
+					write!(f, "\"{}\" ", target))?;
+				write!(f, "[{}; ?]", kind.node)
+			}
 		}
 	}
 }
@@ -39,6 +43,7 @@ impl fmt::Display for IType {
 pub struct Scene<'a, 'b, 'c> {
 	pub scope: IScope<'c, 'b, 'a>,
 	pub return_type: Option<S<RType>>,
+	pub target: Option<Target>,
 	pub value: &'a Value,
 	pub types: Types,
 }

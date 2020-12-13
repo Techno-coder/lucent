@@ -60,15 +60,15 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 					.emit(scene.scope),
 			}
 		}
-		(HNode::Slice(node, left, right), kind!(RType::Slice(box kind))) |
-		(HNode::Slice(node, left, right), IType::Sequence(kind)) => {
+		(HNode::Slice(node, left, right), kind!(RType::Slice(target, box kind))) |
+		(HNode::Slice(node, left, right), IType::Sequence(target, kind)) => {
 			left.as_ref().map(|node| check(scene, node, super::TRUTH));
 			right.as_ref().map(|node| check(scene, node, super::TRUTH));
-			check(scene, node, IType::Sequence(kind.clone()));
-			let kind = RType::Slice(Box::new(kind));
+			check(scene, node, IType::Sequence(target.clone(), kind.clone()));
+			let kind = RType::Slice(target, Box::new(kind));
 			insert(scene, S::new(kind, span));
 		}
-		(HNode::Array(nodes), IType::Sequence(kind)) => {
+		(HNode::Array(nodes), IType::Sequence(_, kind)) => {
 			nodes.iter().for_each(|node| check(scene,
 				node, IType::Type(kind.clone())));
 			let kind = RType::Array(Box::new(kind), nodes.len());
@@ -90,8 +90,9 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 				.emit(scene.scope);
 		}
 		(HNode::Index(node, index), IType::Type(kind)) => {
+			let target = scene.target.clone();
 			check(scene, index, super::INDEX);
-			check(scene, node, IType::Sequence(kind.clone()));
+			check(scene, node, IType::Sequence(target, kind.clone()));
 			insert(scene, kind);
 		}
 		(HNode::Function(path), kind!(other, RType::Function(function))) => {
@@ -120,7 +121,7 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 			}
 		}
 		(HNode::Binary(HBinary::Dual(HDual::Add | HDual::Minus), left, right),
-			IType::Type(kind @ S { node: RType::Pointer(_), .. })) => {
+			IType::Type(kind @ S { node: RType::Pointer(_, _), .. })) => {
 			check(scene, left, IType::Type(kind.clone()));
 			check(scene, right, IType::IntegralSize);
 			insert(scene, kind);
@@ -131,11 +132,12 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 			insert(scene, kind);
 		}
 		(HNode::Unary(Unary::Dereference, node), IType::Type(kind)) => {
-			let pointer = RType::Pointer(Box::new(kind.clone()));
+			let target = scene.target.clone();
+			let pointer = RType::Pointer(target, Box::new(kind.clone()));
 			check(scene, node, IType::Type(S::new(pointer, span)));
 			insert(scene, kind);
 		}
-		(HNode::Unary(Unary::Reference, node), kind!(RType::Pointer(box kind))) |
+		(HNode::Unary(Unary::Reference, node), kind!(RType::Pointer(_, box kind))) |
 		(HNode::Unary(Unary::Not | Unary::Negate, node), IType::Type(kind)) => {
 			check(scene, node, IType::Type(kind.clone()));
 			insert(scene, kind);
@@ -183,10 +185,11 @@ pub fn unifies(left: &S<RType>, right: &S<RType>) -> bool {
 		(Structure(_), _) => left.node == right.node,
 		(Integral(_, _), _) => left.node == right.node,
 		(IntegralSize(_), _) => left.node == right.node,
-		(Slice(left), Slice(right)) => unifies(&left, &right),
-		(Pointer(left), Pointer(right)) => unifies(&left, &right),
 		(Array(left_kind, left_size), Array(right_kind, right_size)) =>
 			left_size == right_size && unifies(&left_kind, &right_kind),
+		(Slice(left_target, left), Slice(right_target, right)) |
+		(Pointer(left_target, left), Pointer(right_target, right)) =>
+			left_target == right_target && unifies(left, right),
 		(Function(left), Function(right)) => {
 			let mut equal = left.convention.as_ref().map(|node| &node.node)
 				== right.convention.as_ref().map(|node| &node.node);
@@ -201,8 +204,9 @@ pub fn unifies(left: &S<RType>, right: &S<RType>) -> bool {
 
 fn unify(target: &S<RType>, kind: &IType) -> bool {
 	match (&target.node, kind) {
-		(RType::Array(target, _), IType::Sequence(kind)) |
-		(RType::Slice(target), IType::Sequence(kind)) => unifies(target, kind),
+		(RType::Array(kind, _), IType::Sequence(_, other)) => unifies(kind, other),
+		(RType::Slice(target, kind), IType::Sequence(targets, other)) =>
+			target == targets && unifies(kind, other),
 		(RType::IntegralSize(_), IType::IntegralSize) => true,
 		(_, IType::Type(kind)) => unifies(target, kind),
 		(_, _) => false,

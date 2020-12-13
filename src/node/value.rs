@@ -68,7 +68,7 @@ impl<'a> Iterator for ValueNodes<'a> {
 	}
 }
 
-/// Uniquely references a `Value`.
+/// Uniquely references a compilation time `Value`.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct VPath(pub Symbol, pub VIndex);
 
@@ -76,8 +76,8 @@ pub struct VPath(pub Symbol, pub VIndex);
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
 pub struct VIndex(usize);
 
-/// A container for values. The graph
-/// of `Value` references forms a tree.
+/// A container for compilation time values.
+/// The graph of `Value` references forms a tree.
 ///
 /// The values are ordered such that values later
 /// in the list will only depend on previously

@@ -37,6 +37,12 @@ pub trait Node<'a>: Sized {
 		Ok(S::new(name, field.offset(span)))
 	}
 
+	fn string(&self) -> &'a str {
+		let text = self.text();
+		let range = 1..text.len() - 1;
+		&text[range]
+	}
+
 	fn offset(&self, span: &TSpan) -> ISpan {
 		TSpan::offset(span, self.span())
 	}

@@ -76,7 +76,7 @@ fn value<'a>(scope: MScope, scene: &mut Scene,
 	let node = (|| Ok(match node.kind() {
 		"break" => HNode::Break,
 		"continue" => HNode::Continue,
-		"string" => HNode::String(node.text().into()),
+		"string" => HNode::String(node.string().into()),
 		"register" => HNode::Register(Identifier(node.text().into())),
 		"truth" => HNode::Truth(node.text() == "true"),
 		"rune" => match node.text().chars().next() {

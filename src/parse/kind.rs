@@ -1,4 +1,4 @@
-use crate::node::{HPath, HType, Sign, Width};
+use crate::node::{HPath, HType, Identifier, Sign, Target, Width};
 use crate::query::{E, MScope, S};
 
 use super::{Node, Scene, TSpan};
@@ -21,16 +21,22 @@ pub fn kind<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 		"slice_type" => {
 			let kind = node.field(scope, "type")?;
 			let kind = self::kind(scope, scene, span, kind)?;
-			HType::Slice(Box::new(kind))
+			HType::Slice(target(span, &node), Box::new(kind))
 		}
 		"pointer" => {
 			let kind = node.field(scope, "type")?;
 			let kind = self::kind(scope, scene, span, kind)?;
-			HType::Pointer(Box::new(kind))
+			HType::Pointer(target(span, &node), Box::new(kind))
 		}
 		"path" => path_kind(scope, scene, span, &node)?,
 		_ => node.invalid(scope)?,
 	}, TSpan::offset(span, node.span())))
+}
+
+pub fn target<'a>(span: &TSpan, node: &impl Node<'a>) -> Option<S<Target>> {
+	let node = node.attribute("target")?;
+	let target = Identifier(node.string().into());
+	Some(S::new(target, node.offset(span)))
 }
 
 fn path_kind<'a>(scope: MScope, scene: &Scene, base: &TSpan,

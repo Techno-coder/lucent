@@ -121,6 +121,20 @@ let pointer: *i32 = &variable + offset
 ```
 The offset is dependent on the size of the pointed type.
 
+The pointer architecture can be explicitly specified by prefixing the pointer with an architecture string:
+```
+let pointer: "target" *i32
+```
+
+### Function pointers
+```
+fn function(argument: type) type
+```
+Function pointers can be constructed by assigning them to a function. They may also be prefixed by an architecture string or convention:
+```
+let pointer: "target" convention fn function()
+```
+
 ### Dereferencing
 ```
 expression!
@@ -261,11 +275,16 @@ Slices are constructed from slicing an array. They can also be created from a ba
 let identifier = [type;] address, size
 ```
 
+Slices may also be annotated with an architecture:
+```
+let identifier: "target" [type;]
+```
+
 ## Compilation time execution
 ```
 let identifier = #expression
 ```
-Prefixing an expression with `#` will evaluate it at compilation time.
+Prefixing an expression with `#` will evaluate it at compilation time. Compilation time expressions are evaluated under the host architecture.
 
 ## Inline values
 ```
@@ -345,10 +364,12 @@ Binary annotations describe the values that used in the headers of the output bi
 
 ### Architecture
 ```
-@architecture identifier
+@architecture "string"
 item
 ```
-Architectures specify how intrinsic language structures should be translated including call and control flow instructions. This annotation can only be applied to modules and functions.
+Architectures specify how intrinsic language structures should be translated including control flow instructions and pointers. This annotation can be applied on any item.
+
+The `"host"` architecture is special in that expressions using it may invoke functions from any other architecture.
 
 ### Addresses
 Address annotations change the location of a symbol in memory. They can be overridden by annotations in nested items. Annotations on modules offset all the items in the module by the same address.

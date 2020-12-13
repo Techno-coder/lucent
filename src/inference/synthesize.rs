@@ -154,9 +154,9 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 				let structure = crate::parse::structure(scope, &path).ok()?;
 				let (_, kind) = structure.fields.get(&name.node)?;
 				scene.lift(kind)?.node
-			} else if let RType::Slice(kind) = kind.node {
+			} else if let RType::Slice(target, kind) = kind.node {
 				match name.node.as_ref() {
-					"address" => RType::Pointer(kind),
+					"address" => RType::Pointer(target, kind),
 					"size" => RType::IntegralSize(Sign::Unsigned),
 					_ => return None,
 				}
@@ -184,7 +184,8 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			let kind = scene.lift(kind)?;
 			let name = &Identifier("address".into());
 			if let Some((span, field)) = fields.get(name) {
-				let kind = RType::Pointer(Box::new(kind.clone()));
+				let target = scene.target.clone();
+				let kind = RType::Pointer(target, Box::new(kind.clone()));
 				super::check(scene, field, raise(S::new(kind, *span)));
 			}
 			kind.node
@@ -201,7 +202,7 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 		HNode::Compound(dual, target, node) => {
 			let target = synthesize(scene, target);
 			if let HDual::Add | HDual::Minus = dual {
-				if let Some(S { node: RType::Pointer(_), .. }) = target {
+				if let Some(S { node: RType::Pointer(_, _), .. }) = target {
 					super::check(scene, node, IType::IntegralSize);
 					return Some(S::new(RType::Void, span));
 				}
@@ -224,7 +225,7 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			}
 
 			if let HBinary::Dual(HDual::Add | HDual::Minus) = binary {
-				if let Some(S { node: RType::Pointer(_), .. }) = left {
+				if let Some(S { node: RType::Pointer(_, _), .. }) = left {
 					super::check(scene, right, IType::IntegralSize);
 					return left;
 				}
@@ -246,9 +247,12 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			let kind = synthesize(scene, node)?;
 			match unary {
 				Unary::Not | Unary::Negate => kind.node,
-				Unary::Reference => RType::Pointer(Box::new(kind)),
+				Unary::Reference => {
+					let target = scene.target.clone();
+					RType::Pointer(target, Box::new(kind))
+				}
 				Unary::Dereference => match kind.node {
-					RType::Pointer(kind) => kind.node,
+					RType::Pointer(_, kind) => kind.node,
 					_ => E::error().message("value is not a pointer")
 						.label(scene.value[*node].span.label())
 						.result(scene.scope).ok()?,

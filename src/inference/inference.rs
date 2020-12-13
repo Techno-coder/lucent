@@ -21,6 +21,7 @@ pub fn function(scope: QScope, path: &FLocal)
 	scope.ctx.typed.inherit(scope, path.clone(), |scope| {
 		let local = crate::parse::local(scope, path)?;
 		let symbol = Symbol::Function(path.as_ref().clone());
+		let target = crate::analysis::target(scope, &symbol)?;
 		let scope = &mut ItemScope::new(scope, symbol.clone());
 		let hint = lift(scope, &local.signature.return_type)?;
 
@@ -31,7 +32,7 @@ pub fn function(scope: QScope, path: &FLocal)
 		}
 
 		let (value, return_type) = (&local.value, Some(hint.clone()));
-		let mut scene = Scene { scope, return_type, value, types };
+		let mut scene = Scene { scope, return_type, target, value, types };
 		super::check(&mut scene, &value.root, super::raise(hint));
 		Ok(Arc::new(scene.types))
 	})
@@ -59,9 +60,9 @@ pub fn types(scope: QScope, path: &VPath)
 	hint(scope, path, None)
 }
 
-/// Infers the types in a value. If a hint is
-/// provided then the type of the value root
-/// will be matched against the hint type.
+/// Infers the types in a compilation time value.
+/// If a hint is provided then the type of the value
+/// root will be matched against the hint type.
 ///
 /// While the hint is not part of the query key,
 /// the query depends on the entire item so this
@@ -76,7 +77,9 @@ pub fn hint(scope: QScope, path: &VPath,
 		let value = crate::parse::value(scope, path)?;
 		let scope = &mut ItemScope::path(scope, path.clone());
 		let (types, value) = (Types::default(), value.as_ref());
-		let mut scene = Scene { scope, return_type: None, value, types };
+		let target: Arc<str> = crate::analysis::TARGET_HOST.into();
+		let (target, return_type) = (Some(Identifier(target)), None);
+		let mut scene = Scene { scope, target, return_type, value, types };
 
 		match hint {
 			Some(hint) => super::check(&mut scene, &value.root, hint),
@@ -125,9 +128,10 @@ pub fn lift(scope: IScope, kind: &S<HType>) -> crate::Result<S<RType>> {
 		HType::Structure(path) => RType::Structure(path.path()),
 		HType::Integral(sign, width) => RType::Integral(*sign, *width),
 		HType::IntegralSize(sign) => RType::IntegralSize(*sign),
-		HType::Pointer(kind) => {
-			let kind = lift(scope, kind)?;
-			RType::Pointer(Box::new(kind))
+		HType::Pointer(target, kind) => {
+			let kind = Box::new(lift(scope, kind)?);
+			let target = target.clone().map(|target| target.node);
+			RType::Pointer(target, kind)
 		}
 		HType::Function(signature) => {
 			let signature = lift_signature(scope, signature);
@@ -139,9 +143,10 @@ pub fn lift(scope: IScope, kind: &S<HType>) -> crate::Result<S<RType>> {
 			let kind = lift(scope, kind)?;
 			RType::Array(Box::new(kind), 0)
 		}
-		HType::Slice(kind) => {
-			let kind = lift(scope, kind)?;
-			RType::Slice(Box::new(kind))
+		HType::Slice(target, kind) => {
+			let kind = Box::new(lift(scope, kind)?);
+			let target = target.clone().map(|target| target.node);
+			RType::Pointer(target, kind)
 		}
 	}, kind.span))
 }
@@ -149,8 +154,9 @@ pub fn lift(scope: IScope, kind: &S<HType>) -> crate::Result<S<RType>> {
 pub fn lift_signature(scope: IScope, signature: &HSignature)
 					  -> crate::Result<Signature> {
 	let convention = signature.convention.clone();
+	let target = signature.target.clone().map(|target| target.node);
 	let parameters = signature.parameters.values().map(|(_, kind)|
 		lift(scope, kind)).collect::<Result<_, _>>()?;
 	let return_type = lift(scope, &signature.return_type)?;
-	Ok(Signature { convention, parameters, return_type })
+	Ok(Signature { target, convention, parameters, return_type })
 }
