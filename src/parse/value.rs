@@ -177,9 +177,10 @@ fn value<'a>(scope: MScope, scene: &mut Scene,
 					HNode::New(path, fields)
 				}
 				"slice_type" => {
-					let kind = kind.field(scope, "type")?;
-					let kind = super::kind(scope, scene, base, kind)?;
-					HNode::SliceNew(kind, fields)
+					let kinds = kind.field(scope, "type")?;
+					let kinds = super::kind(scope, scene, base, kinds)?;
+					let target = super::target(scope, base, &kind)?;
+					HNode::SliceNew(target, kinds, fields)
 				}
 				_ => kind.invalid(scope)?,
 			}

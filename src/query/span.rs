@@ -138,7 +138,7 @@ impl From<Span> for ESpan {
 	}
 }
 
-#[derive(Clone, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Hash, Eq, PartialEq)]
 pub struct S<T> {
 	pub span: ISpan,
 	pub node: T,

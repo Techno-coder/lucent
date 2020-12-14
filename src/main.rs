@@ -1,4 +1,5 @@
 #![feature(option_unwrap_none)]
+#![feature(bindings_after_at)]
 #![feature(bool_to_option)]
 #![feature(box_patterns)]
 #![feature(or_patterns)]
@@ -6,7 +7,7 @@
 
 mod node;
 // mod lower;
-// mod generate;
+mod generate;
 mod compile;
 mod query;
 mod parse;

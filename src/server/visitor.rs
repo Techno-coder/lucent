@@ -184,7 +184,7 @@ fn value<'a: 'b, 'b: 'c, 'c>(visitor: &mut impl ReferenceVisitor<'a, 'b, 'c>,
 							 parameters: Option<&HVariables>) {
 	value.into_iter().for_each(|(index, node)| match &node.node {
 		HNode::Let(_, Some(kind), _) | HNode::Cast(_, Some(kind)) |
-		HNode::SliceNew(kind, _) => self::kind(visitor, base, kind),
+		HNode::SliceNew(_, kind, _) => self::kind(visitor, base, kind),
 		HNode::Variable(variable) => visitor.variable(base,
 			value, parameters, variable, &node.span),
 		HNode::Static(path) => visitor.statics(base, path),

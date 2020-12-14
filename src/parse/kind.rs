@@ -1,4 +1,5 @@
-use crate::node::{HPath, HType, Identifier, Sign, Target, Width};
+use crate::generate::Target;
+use crate::node::{HPath, HType, Sign, Width};
 use crate::query::{E, MScope, S};
 
 use super::{Node, Scene, TSpan};
@@ -21,22 +22,40 @@ pub fn kind<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 		"slice_type" => {
 			let kind = node.field(scope, "type")?;
 			let kind = self::kind(scope, scene, span, kind)?;
-			HType::Slice(target(span, &node), Box::new(kind))
+			let target = target(scope, span, &node)?;
+			HType::Slice(target, Box::new(kind))
 		}
 		"pointer" => {
 			let kind = node.field(scope, "type")?;
 			let kind = self::kind(scope, scene, span, kind)?;
-			HType::Pointer(target(span, &node), Box::new(kind))
+			let target = target(scope, span, &node)?;
+			HType::Pointer(target, Box::new(kind))
+		}
+		"size_type" => {
+			let target = target(scope, span, &node)?;
+			let kind = node.field(scope, "kind")?;
+			match kind.text() {
+				"isize" => HType::IntegralSize(target, Sign::Signed),
+				"usize" => HType::IntegralSize(target, Sign::Unsigned),
+				other => return E::error()
+					.message(format!("invalid size kind: {}", other))
+					.label(kind.span().label()).result(scope),
+			}
 		}
 		"path" => path_kind(scope, scene, span, &node)?,
 		_ => node.invalid(scope)?,
 	}, TSpan::offset(span, node.span())))
 }
 
-pub fn target<'a>(span: &TSpan, node: &impl Node<'a>) -> Option<S<Target>> {
-	let node = node.attribute("target")?;
-	let target = Identifier(node.string().into());
-	Some(S::new(target, node.offset(span)))
+pub fn target<'a>(scope: MScope, base: &TSpan, node: &impl Node<'a>)
+				  -> crate::Result<Option<S<Target>>> {
+	node.attribute("target").map(|node| {
+		let target = Target::parse(node.string());
+		let target = target.ok_or_else(|| E::error()
+			.message(format!("unknown architecture: {}", node.text()))
+			.label(node.span().label()).to(scope))?;
+		Ok(S::new(target, node.offset(base)))
+	}).transpose()
 }
 
 fn path_kind<'a>(scope: MScope, scene: &Scene, base: &TSpan,
@@ -49,8 +68,6 @@ fn path_kind<'a>(scope: MScope, scene: &Scene, base: &TSpan,
 				"rune" => return Ok(HType::Rune),
 				"truth" => return Ok(HType::Truth),
 				"never" => return Ok(HType::Never),
-				"isize" => return Ok(HType::IntegralSize(Sign::Signed)),
-				"usize" => return Ok(HType::IntegralSize(Sign::Unsigned)),
 				"i8" => return Ok(HType::Integral(Sign::Signed, Width::B)),
 				"i16" => return Ok(HType::Integral(Sign::Signed, Width::W)),
 				"i32" => return Ok(HType::Integral(Sign::Signed, Width::D)),

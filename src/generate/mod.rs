@@ -1,1 +1,3 @@
-pub mod x86;
+pub use target::*;
+
+mod target;

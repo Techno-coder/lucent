@@ -1,13 +1,12 @@
 use std::fmt;
 use std::sync::Arc;
 
+use crate::generate::Target;
 use crate::query::S;
 
 use super::Path;
 
 pub type Register = Identifier;
-/// The target architecture for an item.
-pub type Target = Identifier;
 /// The calling convention for a function or call.
 pub type Convention = Option<S<Identifier>>;
 /// The overload index for functions with the same path.
@@ -148,12 +147,11 @@ pub struct Signature {
 
 impl fmt::Display for Signature {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-		self.target.iter().try_for_each(|target|
-			write!(f, "\"{}\" ", target))?;
+		prefix(f, &self.target)?;
 		self.convention.iter().try_for_each(|convention|
-			write!(f, "\"{}\" ", convention.node))?;
-
+			write!(f, "{} ", convention.node))?;
 		write!(f, "fn(")?;
+
 		if let Some((last, parameters)) = self.parameters.split_last() {
 			parameters.iter().try_for_each(|parameter|
 				write!(f, "{}, ", parameter.node))?;
@@ -172,7 +170,7 @@ pub enum Type<P, F, V, T> {
 	Never,
 	Structure(P),
 	Integral(Sign, Width),
-	IntegralSize(Sign),
+	IntegralSize(T, Sign),
 	Function(Box<F>),
 	Pointer(T, Box<S<Self>>),
 	Slice(T, Box<S<Self>>),
@@ -188,20 +186,26 @@ impl fmt::Display for RType {
 			Type::Never => write!(f, "never"),
 			Type::Structure(path) => write!(f, "{}", path),
 			Type::Integral(sign, width) => write!(f, "{}{}", sign, width),
-			Type::IntegralSize(sign) => write!(f, "{}size", sign),
 			Type::Function(signature) => write!(f, "{}", signature),
-			Type::Array(kind, size) =>
-				write!(f, "[{}; {}]", kind.node, size),
+			Type::IntegralSize(target, sign) => {
+				prefix(f, target)?;
+				write!(f, "{}size", sign)
+			}
 			Type::Pointer(target, kind) => {
-				target.iter().try_for_each(|target|
-					write!(f, "\"{}\" ", target))?;
+				prefix(f, target)?;
 				write!(f, "*{}", kind.node)
 			}
+			Type::Array(kind, size) =>
+				write!(f, "[{}; {}]", kind.node, size),
 			Type::Slice(target, kind) => {
-				target.iter().try_for_each(|target|
-					write!(f, "\"{}\" ", target))?;
+				prefix(f, target)?;
 				write!(f, "[{};]", kind.node)
 			}
 		}
 	}
+}
+
+pub fn prefix<T>(f: &mut fmt::Formatter, value: &Option<T>)
+				 -> fmt::Result where T: fmt::Display {
+	value.iter().try_for_each(|value| write!(f, "{} ", value))
 }

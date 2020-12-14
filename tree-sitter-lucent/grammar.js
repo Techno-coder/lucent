@@ -108,6 +108,7 @@ module.exports = grammar({
             $.signature_type,
             $.array_type,
             $.slice_type,
+            $.size_type,
             $.pointer,
             $.path,
         ),
@@ -117,6 +118,11 @@ module.exports = grammar({
             optional(field('target', $.string)),
             signature($, false),
         )),
+
+        size_type: $ => seq(
+            optional(field('target', $.string)),
+            field('kind', choice('usize', 'isize')),
+        ),
 
         pointer: $ => seq(
             optional(field('target', $.string)),

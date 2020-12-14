@@ -1,7 +1,7 @@
 use crate::node::*;
 use crate::query::{E, S};
 
-use super::{INDEX, IType, raise, Scene, TRUTH};
+use super::{IType, raise, Scene, TRUTH};
 
 pub fn synthesize(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 	let kind = synthesized(scene, index)?;
@@ -157,7 +157,7 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			} else if let RType::Slice(target, kind) = kind.node {
 				match name.node.as_ref() {
 					"address" => RType::Pointer(target, kind),
-					"size" => RType::IntegralSize(Sign::Unsigned),
+					"size" => RType::IntegralSize(target, Sign::Unsigned),
 					_ => return None,
 				}
 			} else {
@@ -176,34 +176,41 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			}
 			RType::Structure(path)
 		}
-		HNode::SliceNew(kind, fields) => {
+		HNode::SliceNew(target, kind, fields) => {
+			let index = target.map(|target| {
+				let kind = Some(target.node);
+				let kind = RType::IntegralSize(kind, Sign::Unsigned);
+				raise(S::new(kind, target.span))
+			}).unwrap_or_else(|| super::index(scene));
+
 			let name = &Identifier("size".into());
 			fields.get(name).map(|(_, field)|
-				super::check(scene, field, INDEX));
+				super::check(scene, field, index));
 
 			let kind = scene.lift(kind)?;
 			let name = &Identifier("address".into());
 			if let Some((span, field)) = fields.get(name) {
-				let target = scene.target.clone();
-				let kind = RType::Pointer(target, Box::new(kind.clone()));
+				let kind = RType::Pointer(scene.target, Box::new(kind.clone()));
 				super::check(scene, field, raise(S::new(kind, *span)));
 			}
 			kind.node
 		}
 		HNode::Slice(node, left, right) => {
-			left.map(|node| super::check(scene, &node, INDEX));
-			right.map(|node| super::check(scene, &node, INDEX));
+			let index = super::index(scene);
+			left.map(|node| super::check(scene, &node, index.clone()));
+			right.map(|node| super::check(scene, &node, index));
 			synthesize(scene, node)?.node
 		}
 		HNode::Index(node, index) => {
-			super::check(scene, index, INDEX);
+			let kind = super::index(scene);
+			super::check(scene, index, kind);
 			synthesize(scene, node)?.node
 		}
 		HNode::Compound(dual, target, node) => {
 			let target = synthesize(scene, target);
 			if let HDual::Add | HDual::Minus = dual {
-				if let Some(S { node: RType::Pointer(_, _), .. }) = target {
-					super::check(scene, node, IType::IntegralSize);
+				if let Some(S { node: RType::Pointer(target, _), .. }) = target {
+					super::check(scene, node, IType::IntegralSize(target));
 					return Some(S::new(RType::Void, span));
 				}
 			}
@@ -225,8 +232,8 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			}
 
 			if let HBinary::Dual(HDual::Add | HDual::Minus) = binary {
-				if let Some(S { node: RType::Pointer(_, _), .. }) = left {
-					super::check(scene, right, IType::IntegralSize);
+				if let Some(S { node: RType::Pointer(target, _), .. }) = left {
+					super::check(scene, right, IType::IntegralSize(target));
 					return left;
 				}
 			}
@@ -248,8 +255,8 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			match unary {
 				Unary::Not | Unary::Negate => kind.node,
 				Unary::Reference => {
-					let target = scene.target.clone();
-					RType::Pointer(target, Box::new(kind))
+					let kind = Box::new(kind);
+					RType::Pointer(scene.target, kind)
 				}
 				Unary::Dereference => match kind.node {
 					RType::Pointer(_, kind) => kind.node,

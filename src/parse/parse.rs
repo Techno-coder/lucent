@@ -150,7 +150,7 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 
 							let scene = &mut Scene { inclusions, values: &mut values };
 							let annotations = annotations(scope, scene, span, &node)?;
-							let (name, kind) = super::variable(scope, scene, span, node)?;
+							let (name, kind) = super::variable(scope, scene, span, symbol)?;
 							let load = HLoadStatic {
 								values,
 								library,
@@ -170,7 +170,7 @@ fn item<'a>(scope: MScope, symbols: &SymbolTable, table: &mut ItemTable,
 							let span = &symbols.functions[&identifier][entry.len()];
 
 							let annotations = annotations(scope, scene, span, &node)?;
-							let signature = signature(scope, scene, span, &node)?;
+							let signature = signature(scope, scene, span, &symbol)?;
 							let name = symbol.identifier_span(scope, span)?;
 							let library = library(scope, span)?;
 							let function = HLoadFunction {
@@ -279,7 +279,7 @@ pub fn path<'a>(scope: MScope, span: &TSpan,
 pub fn signature<'a>(scope: MScope, scene: &mut Scene, span: &TSpan,
 					 node: &impl Node<'a>) -> crate::Result<HSignature> {
 	Ok(HSignature {
-		target: super::target(span, node),
+		target: super::target(scope, span, node)?,
 		convention: node.attribute("convention").map(|node|
 			S::new(Identifier(node.text().into()), node.offset(span))),
 		parameters: super::variables(scope, scene, span, node)?,

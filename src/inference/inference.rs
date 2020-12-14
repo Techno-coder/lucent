@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::generate::Target;
 use crate::node::*;
 use crate::parse::{PStatic, Universal};
 use crate::query::{IScope, ItemScope, QScope, S};
@@ -76,9 +77,8 @@ pub fn hint(scope: QScope, path: &VPath,
 	scope.ctx.types.inherit(scope, path.clone(), |scope| {
 		let value = crate::parse::value(scope, path)?;
 		let scope = &mut ItemScope::path(scope, path.clone());
+		let (target, return_type) = (Some(Target::Host), None);
 		let (types, value) = (Types::default(), value.as_ref());
-		let target: Arc<str> = crate::analysis::TARGET_HOST.into();
-		let (target, return_type) = (Some(Identifier(target)), None);
 		let mut scene = Scene { scope, target, return_type, value, types };
 
 		match hint {
@@ -127,10 +127,13 @@ pub fn lift(scope: IScope, kind: &S<HType>) -> crate::Result<S<RType>> {
 		HType::Never => RType::Never,
 		HType::Structure(path) => RType::Structure(path.path()),
 		HType::Integral(sign, width) => RType::Integral(*sign, *width),
-		HType::IntegralSize(sign) => RType::IntegralSize(*sign),
+		HType::IntegralSize(target, sign) => {
+			let target = target.map(|target| target.node);
+			RType::IntegralSize(target, *sign)
+		}
 		HType::Pointer(target, kind) => {
 			let kind = Box::new(lift(scope, kind)?);
-			let target = target.clone().map(|target| target.node);
+			let target = target.map(|target| target.node);
 			RType::Pointer(target, kind)
 		}
 		HType::Function(signature) => {
@@ -145,7 +148,7 @@ pub fn lift(scope: IScope, kind: &S<HType>) -> crate::Result<S<RType>> {
 		}
 		HType::Slice(target, kind) => {
 			let kind = Box::new(lift(scope, kind)?);
-			let target = target.clone().map(|target| target.node);
+			let target = target.map(|target| target.node);
 			RType::Pointer(target, kind)
 		}
 	}, kind.span))
@@ -154,7 +157,7 @@ pub fn lift(scope: IScope, kind: &S<HType>) -> crate::Result<S<RType>> {
 pub fn lift_signature(scope: IScope, signature: &HSignature)
 					  -> crate::Result<Signature> {
 	let convention = signature.convention.clone();
-	let target = signature.target.clone().map(|target| target.node);
+	let target = signature.target.map(|target| target.node);
 	let parameters = signature.parameters.values().map(|(_, kind)|
 		lift(scope, kind)).collect::<Result<_, _>>()?;
 	let return_type = lift(scope, &signature.return_type)?;

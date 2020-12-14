@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use indexmap::IndexMap;
 
 use crate::FilePath;
+use crate::generate::Target;
 use crate::query::{ISpan, S, Span};
 
 use super::*;
@@ -111,7 +112,7 @@ pub enum HNode {
 	Method(HIndex, Vec<HIndex>),
 	Field(HIndex, S<Identifier>),
 	New(HPath, HFields),
-	SliceNew(S<HType>, HFields),
+	SliceNew(Option<S<Target>>, S<HType>, HFields),
 	Slice(HIndex, Option<HIndex>, Option<HIndex>),
 	Index(HIndex, HIndex),
 	Compound(HDual, HIndex, HIndex),

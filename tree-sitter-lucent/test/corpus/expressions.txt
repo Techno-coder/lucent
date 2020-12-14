@@ -218,6 +218,7 @@ fn function()
 	let pointer: "target" *u8
 	let pointer: "target" [u8;]
 	let pointer: "target" fn()
+	let size: "target" usize
 
 ---
 
@@ -227,7 +228,8 @@ fn function()
 			(string) (path (identifier))))
 		(let (identifier) (slice_type
 			(string) (path (identifier))))
-		(let (identifier) (signature_type (string))))))
+		(let (identifier) (signature_type (string)))
+		(let (identifier) (size_type (string))))))
 
 =====================================
 If expressions

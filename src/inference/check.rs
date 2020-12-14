@@ -64,7 +64,7 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 		(HNode::Slice(node, left, right), IType::Sequence(target, kind)) => {
 			left.as_ref().map(|node| check(scene, node, super::TRUTH));
 			right.as_ref().map(|node| check(scene, node, super::TRUTH));
-			check(scene, node, IType::Sequence(target.clone(), kind.clone()));
+			check(scene, node, IType::Sequence(target, kind.clone()));
 			let kind = RType::Slice(target, Box::new(kind));
 			insert(scene, S::new(kind, span));
 		}
@@ -90,9 +90,8 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 				.emit(scene.scope);
 		}
 		(HNode::Index(node, index), IType::Type(kind)) => {
-			let target = scene.target.clone();
-			check(scene, index, super::INDEX);
-			check(scene, node, IType::Sequence(target, kind.clone()));
+			check(scene, index, super::index(scene));
+			check(scene, node, IType::Sequence(scene.target, kind.clone()));
 			insert(scene, kind);
 		}
 		(HNode::Function(path), kind!(other, RType::Function(function))) => {
@@ -121,10 +120,10 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 			}
 		}
 		(HNode::Binary(HBinary::Dual(HDual::Add | HDual::Minus), left, right),
-			IType::Type(kind @ S { node: RType::Pointer(_, _), .. })) => {
+			IType::Type(ref kind @ S { node: RType::Pointer(target, _), .. })) => {
 			check(scene, left, IType::Type(kind.clone()));
-			check(scene, right, IType::IntegralSize);
-			insert(scene, kind);
+			check(scene, right, IType::IntegralSize(target));
+			insert(scene, kind.clone());
 		}
 		(HNode::Binary(HBinary::Dual(_), left, right), IType::Type(kind)) => {
 			check(scene, left, IType::Type(kind.clone()));
@@ -132,8 +131,7 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 			insert(scene, kind);
 		}
 		(HNode::Unary(Unary::Dereference, node), IType::Type(kind)) => {
-			let target = scene.target.clone();
-			let pointer = RType::Pointer(target, Box::new(kind.clone()));
+			let pointer = RType::Pointer(scene.target, Box::new(kind.clone()));
 			check(scene, node, IType::Type(S::new(pointer, span)));
 			insert(scene, kind);
 		}
@@ -146,10 +144,10 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 			super::synthesize(scene, node);
 			insert(scene, kind);
 		}
-		(HNode::Integral(_), IType::IntegralSize) =>
-			insert(scene, S::new(RType::IntegralSize(Sign::Unsigned), span)),
-		(HNode::Integral(_), kind!(span, RType::IntegralSize(sign))) =>
-			insert(scene, S::new(RType::IntegralSize(sign), span)),
+		(HNode::Integral(_), IType::IntegralSize(target)) =>
+			insert(scene, S::new(RType::IntegralSize(target, Sign::Unsigned), span)),
+		(HNode::Integral(_), kind!(span, RType::IntegralSize(target, sign))) =>
+			insert(scene, S::new(RType::IntegralSize(target, sign), span)),
 		(HNode::Integral(_), kind!(span, RType::Integral(sign, width))) =>
 			insert(scene, S::new(RType::Integral(sign, width), span)),
 		(HNode::Integral(_), kind) =>
@@ -184,7 +182,7 @@ pub fn unifies(left: &S<RType>, right: &S<RType>) -> bool {
 		(Void, Void) | (_, Never) | (Never, _) => true,
 		(Structure(_), _) => left.node == right.node,
 		(Integral(_, _), _) => left.node == right.node,
-		(IntegralSize(_), _) => left.node == right.node,
+		(IntegralSize(_, _), _) => left.node == right.node,
 		(Array(left_kind, left_size), Array(right_kind, right_size)) =>
 			left_size == right_size && unifies(&left_kind, &right_kind),
 		(Slice(left_target, left), Slice(right_target, right)) |
@@ -205,9 +203,9 @@ pub fn unifies(left: &S<RType>, right: &S<RType>) -> bool {
 fn unify(target: &S<RType>, kind: &IType) -> bool {
 	match (&target.node, kind) {
 		(RType::Array(kind, _), IType::Sequence(_, other)) => unifies(kind, other),
+		(RType::IntegralSize(target, _), IType::IntegralSize(targets)) => target == targets,
 		(RType::Slice(target, kind), IType::Sequence(targets, other)) =>
 			target == targets && unifies(kind, other),
-		(RType::IntegralSize(_), IType::IntegralSize) => true,
 		(_, IType::Type(kind)) => unifies(target, kind),
 		(_, _) => false,
 	}

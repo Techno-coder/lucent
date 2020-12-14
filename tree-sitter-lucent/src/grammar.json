@@ -799,6 +799,10 @@
         },
         {
           "type": "SYMBOL",
+          "name": "size_type"
+        },
+        {
+          "type": "SYMBOL",
           "name": "pointer"
         },
         {
@@ -1041,6 +1045,44 @@
           }
         ]
       }
+    },
+    "size_type": {
+      "type": "SEQ",
+      "members": [
+        {
+          "type": "CHOICE",
+          "members": [
+            {
+              "type": "FIELD",
+              "name": "target",
+              "content": {
+                "type": "SYMBOL",
+                "name": "string"
+              }
+            },
+            {
+              "type": "BLANK"
+            }
+          ]
+        },
+        {
+          "type": "FIELD",
+          "name": "kind",
+          "content": {
+            "type": "CHOICE",
+            "members": [
+              {
+                "type": "STRING",
+                "value": "usize"
+              },
+              {
+                "type": "STRING",
+                "value": "isize"
+              }
+            ]
+          }
+        }
+      ]
     },
     "pointer": {
       "type": "SEQ",
