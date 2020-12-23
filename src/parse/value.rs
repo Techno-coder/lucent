@@ -88,7 +88,7 @@ fn value<'a>(scope: MScope, scene: &mut Scene,
 		"path" => paths(scope, scene, base, node)?.node,
 		"block" => scene.scope(|scene| HNode::Block(node.children()
 			.map(|node| value(scope, scene, base, &node)).collect())),
-		"group" => HNode::Block(vec![field(scope, scene, "value")?]),
+		"group" => HNode::Block(Box::new([field(scope, scene, "value")?])),
 		// let variable: type = value
 		"let" => {
 			let next = |index| index + 1;
@@ -233,9 +233,9 @@ fn value<'a>(scope: MScope, scene: &mut Scene,
 			match node.field(scope, "operator")?.text() {
 				"#" => HNode::Compile(valued(scope, scene, base, values)),
 				"inline" => HNode::Inline(valued(scope, scene, base, values)),
-				"!" => HNode::Unary(Unary::Not, value(scope, scene, base, &values)),
-				"-" => HNode::Unary(Unary::Negate, value(scope, scene, base, &values)),
-				"&" => HNode::Unary(Unary::Reference, value(scope, scene, base, &values)),
+				"!" => HNode::Unary(HUnary::Not, value(scope, scene, base, &values)),
+				"-" => HNode::Unary(HUnary::Negate, value(scope, scene, base, &values)),
+				"&" => HNode::Unary(HUnary::Reference, value(scope, scene, base, &values)),
 				_ => E::error().message("invalid unary operator")
 					.label(label.clone()).result(scope)?,
 			}
@@ -243,7 +243,7 @@ fn value<'a>(scope: MScope, scene: &mut Scene,
 		// value!
 		"dereference" => {
 			let value = field(scope, scene, "value")?;
-			HNode::Unary(Unary::Dereference, value)
+			HNode::Unary(HUnary::Dereference, value)
 		}
 		// left + right
 		"binary" => {

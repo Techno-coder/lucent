@@ -24,8 +24,8 @@ impl<S> E<S> {
 		Self::new(diagnostic::Severity::Error)
 	}
 
-	pub fn message(mut self, message: impl Into<String>) -> Self {
-		self.error.message = message.into();
+	pub fn message(mut self, message: impl ToString) -> Self {
+		self.error.message = message.to_string();
 		self
 	}
 
@@ -34,8 +34,8 @@ impl<S> E<S> {
 		self
 	}
 
-	pub fn note(mut self, note: impl Into<String>) -> Self {
-		self.error.notes.push(note.into());
+	pub fn note(mut self, note: impl ToString) -> Self {
+		self.error.notes.push(note.to_string());
 		self
 	}
 }
@@ -80,8 +80,8 @@ impl<S> Label<S> {
 		Self { style, message: String::new(), span }
 	}
 
-	pub fn message(mut self, message: impl Into<String>) -> Self {
-		self.message = message.into();
+	pub fn message(mut self, message: impl ToString) -> Self {
+		self.message = message.to_string();
 		self
 	}
 }

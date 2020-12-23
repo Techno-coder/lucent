@@ -166,9 +166,8 @@ impl<'a, 'b, 'c> ReferenceVisitor<'a, 'b, 'c> for Tokens<'a, 'b, 'c> {
 	fn field(&mut self, base: &TSpan, structure: &Arc<Path>,
 			 name: &Identifier, span: &ISpan) {
 		let data = crate::parse::structure(self.scope, structure);
-		if data.unwrap().fields.contains_key(name) {
-			self.token(base, span, Token::Property);
-		}
+		data.ok().map(|data| data.fields.contains_key(name)
+			.then(|| self.token(base, span, Token::Property)));
 	}
 
 	fn function(&mut self, base: &TSpan, path: &HPath, _: usize) {

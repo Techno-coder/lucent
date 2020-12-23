@@ -8,6 +8,8 @@ use crate::query::{IScope, ItemScope, QScope, S};
 
 use super::{IType, Scene};
 
+/// Contains derived information from type
+/// inference. Erroneous types are absent.
 #[derive(Debug, Default)]
 pub struct Types {
 	pub nodes: HashMap<HIndex, S<RType>>,
@@ -28,7 +30,7 @@ pub fn function(scope: QScope, path: &FLocal)
 
 		let mut types = Types::default();
 		for (name, (_, kind)) in &local.signature.parameters {
-			let variable = Variable(name.clone(), 0);
+			let variable = Variable::parameter(name.clone());
 			types.variables.insert(variable, lift(scope, kind)?);
 		}
 
@@ -141,9 +143,13 @@ pub fn lift(scope: IScope, kind: &S<HType>) -> crate::Result<S<RType>> {
 			RType::Function(Box::new(signature?))
 		}
 		HType::Array(kind, size) => {
-			// TODO: evaluate array size
-			let _size = VPath(scope.symbol.clone(), *size);
 			let kind = lift(scope, kind)?;
+			let size = &VPath(scope.symbol.clone(), *size);
+			let index = super::index(Some(Target::Host));
+
+			// TODO: evaluate array size
+			let scope = &mut scope.span(kind.span);
+			hint(scope, size, Some(index))?;
 			RType::Array(Box::new(kind), 0)
 		}
 		HType::Slice(target, kind) => {

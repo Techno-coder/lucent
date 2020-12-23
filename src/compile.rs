@@ -14,7 +14,7 @@ pub fn compile(path: FilePath) -> std::io::Result<()> {
 	let path = path.push(Identifier("fibonacci".into()));
 
 	let path = FLocal(FPath(path, 0));
-	let _ = crate::inference::function(queries, &path).unwrap();
+	let _ = crate::lower::function(queries, &path);
 
 	display_diagnostics(scope)
 }

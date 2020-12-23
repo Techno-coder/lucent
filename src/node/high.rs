@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use indexmap::IndexMap;
 
@@ -97,9 +98,10 @@ pub struct HGlobalAnnotation {
 /// closely resembles source code. All paths and
 /// variables are resolved and exist with the
 /// exception of the `Unresolved` error variant.
+/// Blocks may be empty.
 #[derive(Debug, PartialEq)]
 pub enum HNode {
-	Block(Vec<HIndex>),
+	Block(Box<[HIndex]>),
 	Let(S<Variable>, Option<S<HType>>, Option<HIndex>),
 	Set(HIndex, HIndex),
 	While(HIndex, HIndex),
@@ -117,13 +119,13 @@ pub enum HNode {
 	Index(HIndex, HIndex),
 	Compound(HDual, HIndex, HIndex),
 	Binary(HBinary, HIndex, HIndex),
-	Unary(Unary, HIndex),
+	Unary(HUnary, HIndex),
 	Variable(Variable),
 	Function(HPath),
 	Static(HPath),
-	String(String),
-	Register(Register),
+	String(Arc<str>),
 	Array(Vec<HIndex>),
+	Register(Register),
 	Integral(i128),
 	Truth(bool),
 	Rune(char),
@@ -133,7 +135,15 @@ pub enum HNode {
 	Error(Vec<HIndex>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum HUnary {
+	Not,
+	Negate,
+	Reference,
+	Dereference,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum HBinary {
 	Dual(HDual),
 	And,
@@ -162,7 +172,7 @@ impl HBinary {
 	}
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum HDual {
 	Add,
 	Minus,

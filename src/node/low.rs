@@ -1,56 +1,95 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+
 use crate::query::S;
 
 use super::*;
 
 pub type LReceiver = Receiver<BNode>;
-pub type LNode = S<LowNode>;
-type BNode = Box<LNode>;
+type BNode = Box<S<LNode>>;
+type BUnit = Box<S<LUnit>>;
 
 #[derive(Debug)]
 pub struct LFunction {
-	pub node: LNode,
+	pub unit: S<LUnit>,
+	pub parameters: HashMap<Identifier, LTarget>,
+	pub locals: HashMap<LTarget, S<Size>>,
+}
+
+#[derive(Debug)]
+pub struct LValue {
+	pub value: LValued,
+	pub locals: HashMap<LTarget, S<Size>>,
+}
+
+#[derive(Debug)]
+pub enum LValued {
+	Node(S<LNode>),
+	Block(S<LUnit>),
 }
 
 /// A lower variant of `HNode` that is
 /// amenable to code generation. Used in lowering
 /// to `SNode`s or stack based code generators
-/// such as `wasm`.
-///
-/// Type information is not preserved.
+/// such as `wasm`. Type information is not
+/// preserved. Blocks may be empty.
+#[derive(Debug, Clone)]
+pub enum LNode {
+	Block(Box<[S<LUnit>]>, BNode),
+	If(BNode, BNode, Option<BNode>),
+	Call(LReceiver, Vec<S<LNode>>),
+	Cast(BNode, (Sign, Width), Width),
+	Binary(LBinary, Width, BNode, BNode),
+	Unary(LUnary, Width, BNode),
+	Dereference(LPlace),
+	Compile(VIndex),
+	Target(LTarget),
+	Function(FPath),
+	Static(Arc<Path>),
+	Register(Register),
+	String(Arc<str>),
+	Integral(i128),
+	Never(BUnit),
+}
+
+/// The imperative complement to `LNode`s.
 /// Control flow statements such as `continue`
 /// and `break` must be valid at their position.
-#[derive(Debug)]
-pub enum LowNode {
-	Block(Vec<LNode>),
-	Let(S<LTarget>, S<Size>),
-	LetZero(S<LTarget>, S<Size>),
-	Set(BNode, BNode),
-	Loop(BNode),
-	If(BNode, BNode, Option<BNode>),
-	Cast(BNode, S<Width>),
-	Return(BNode),
-	Call(LReceiver, Vec<LNode>),
-	Offset(BNode, S<usize>),
-	Binary(LBinary, Width, BNode, BNode),
-	Unary(Unary, Width, BNode),
-	Compile(VPath),
-	Inline(VPath),
-	Target(S<LTarget>),
-	Function(FPath),
-	Static(Path),
-	String(String),
-	Register(Identifier),
-	Integral(i128),
-	Truth(bool),
+/// Blocks may be empty. No mutations are made
+/// on zero sized values.
+#[derive(Debug, Clone)]
+pub enum LUnit {
+	Block(Box<[S<LUnit>]>),
+	If(S<LNode>, BUnit, Option<BUnit>),
+	Call(LReceiver, Vec<S<LNode>>),
+	Return(Option<S<LNode>>),
+	Set(LPlace, S<LNode>),
+	Zero(LTarget),
+	Loop(BUnit),
+	Compile(VIndex),
+	Inline(VIndex),
+	Node(S<LNode>),
 	Continue,
 	Break,
 }
 
+/// An assignable value.
+/// The enclosed node must evaluate to
+/// an architecture compatible pointer.
+#[derive(Debug, Clone)]
+pub struct LPlace(pub BNode);
+
 /// Identifies a stack variable.
-#[derive(Debug)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct LTarget(pub usize);
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
+pub enum LUnary {
+	Not,
+	Negate,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub enum LBinary {
 	Add,
 	Minus,

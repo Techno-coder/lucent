@@ -4,9 +4,9 @@ use std::sync::Arc;
 use crate::node::Identifier;
 use crate::query::S;
 
-/// Represents a sequence of identifiers that uniquely
-/// references an item. Note that the order is reversed
-/// as the outermost module is the deepest path element.
+/// Represents a sequence of identifiers that references
+/// an item. Note that the order is reversed as the
+/// outermost module is the deepest path element.
 #[derive(Clone, Hash, Eq, PartialEq)]
 pub enum Path { Root, Node(Arc<Path>, Identifier) }
 

@@ -1,3 +1,4 @@
+use crate::generate::Target;
 use crate::node::*;
 use crate::query::{E, S};
 
@@ -15,7 +16,10 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 	Some(S::new(match node {
 		HNode::Block(nodes) => {
 			let synthesize = |node| synthesize(scene, node);
-			return nodes.iter().map(synthesize).last().unwrap();
+			match nodes.iter().map(synthesize).last() {
+				Some(kind) => return kind,
+				None => RType::Void,
+			}
 		}
 		HNode::Let(variable, kind, node) => {
 			let kind = match (kind, node) {
@@ -45,7 +49,7 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			RType::Void
 		}
 		HNode::When(branches) => {
-			let mut first = None;
+			let mut first: Option<S<RType>> = None;
 			let (mut equal, mut complete) = (true, false);
 			for (condition, node) in branches {
 				super::check(scene, condition, TRUTH);
@@ -135,6 +139,7 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 			}
 		}
 		HNode::Method(node, arguments) => {
+			let span = scene.value[*node].span;
 			let kind = synthesize(scene, node)?;
 			if let RType::Function(signature) = kind.node {
 				Iterator::zip(signature.parameters.into_iter()
@@ -142,36 +147,50 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 					super::check(scene, node, parameter));
 				signature.return_type.node
 			} else {
-				E::error().message("value is not a function")
-					.label(kind.span.label()).emit(scene.scope);
-				return None;
+				let message = format!("expected function, found: {}", kind.node);
+				let error = E::error().message(message).label(span.label());
+				return error.result(scene.scope).ok();
 			}
 		}
 		HNode::Field(node, name) => {
+			let span = scene.value[*node].span;
 			let kind = synthesize(scene, node)?;
-			if let RType::Structure(path) = kind.node {
+			let undefined = |scene: &mut Scene, node| E::error()
+				.label(span.other().message(node)).label(name.span.label())
+				.message(format!("undefined field: {}", name.node))
+				.result(scene.scope).ok();
+
+			if let RType::Structure(path) = &kind.node {
 				let scope = &mut scene.scope.span(kind.span);
-				let structure = crate::parse::structure(scope, &path).ok()?;
-				let (_, kind) = structure.fields.get(&name.node)?;
-				scene.lift(kind)?.node
-			} else if let RType::Slice(target, kind) = kind.node {
+				let structure = crate::parse::structure(scope, path).ok()?;
+				match structure.fields.get(&name.node) {
+					Some((_, kind)) => scene.lift(kind)?.node,
+					None => undefined(scene, &kind.node)?,
+				}
+			} else if let RType::Slice(target, other) = kind.node {
 				match name.node.as_ref() {
-					"address" => RType::Pointer(target, kind),
+					"address" => RType::Pointer(target, other),
 					"size" => RType::IntegralSize(target, Sign::Unsigned),
-					_ => return None,
+					_ => undefined(scene, &RType::Slice(target, other))?,
 				}
 			} else {
-				return None;
+				let message = format!("expected structure, found: {}", kind.node);
+				let error = E::error().message(message).label(span.label());
+				return error.result(scene.scope).ok();
 			}
 		}
 		HNode::New(path, fields) => {
 			let path = path.path();
 			let scope = &mut scene.scope.span(span);
 			let structure = crate::parse::structure(scope, &path);
-			for (name, (_, kind)) in &structure.ok()?.fields {
+			for (name, (span, kind)) in &structure.ok()?.fields {
 				if let Some((_, field)) = fields.get(name) {
 					let kind = scene.lift(kind);
 					super::checked(scene, field, kind);
+				} else {
+					let error = E::error().label(span.label());
+					let message = format!("undefined field: {}", name);
+					error.message(message).emit(scene.scope);
 				}
 			}
 			RType::Structure(path)
@@ -181,7 +200,7 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 				let kind = Some(target.node);
 				let kind = RType::IntegralSize(kind, Sign::Unsigned);
 				raise(S::new(kind, target.span))
-			}).unwrap_or_else(|| super::index(scene));
+			}).unwrap_or_else(|| super::index(scene.target));
 
 			let name = &Identifier("size".into());
 			fields.get(name).map(|(_, field)|
@@ -193,18 +212,20 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 				let kind = RType::Pointer(scene.target, Box::new(kind.clone()));
 				super::check(scene, field, raise(S::new(kind, *span)));
 			}
-			kind.node
+
+			let target = target.map(|target| target.node);
+			RType::Slice(target, Box::new(kind))
 		}
 		HNode::Slice(node, left, right) => {
-			let index = super::index(scene);
-			left.map(|node| super::check(scene, &node, index.clone()));
-			right.map(|node| super::check(scene, &node, index));
-			synthesize(scene, node)?.node
+			let (kind, target) = sequence(scene, node)?;
+			left.map(|node| super::check(scene, &node, super::index(target)));
+			right.map(|node| super::check(scene, &node, super::index(target)));
+			RType::Slice(target, kind)
 		}
 		HNode::Index(node, index) => {
-			let kind = super::index(scene);
-			super::check(scene, index, kind);
-			synthesize(scene, node)?.node
+			let (kind, target) = sequence(scene, node)?;
+			super::check(scene, index, super::index(target));
+			return Some(*kind);
 		}
 		HNode::Compound(dual, target, node) => {
 			let target = synthesize(scene, target);
@@ -253,15 +274,15 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 		HNode::Unary(unary, node) => {
 			let kind = synthesize(scene, node)?;
 			match unary {
-				Unary::Not | Unary::Negate => kind.node,
-				Unary::Reference => {
+				HUnary::Not | HUnary::Negate => kind.node,
+				HUnary::Reference => {
 					let kind = Box::new(kind);
 					RType::Pointer(scene.target, kind)
 				}
-				Unary::Dereference => match kind.node {
+				HUnary::Dereference => match kind.node {
 					RType::Pointer(_, kind) => kind.node,
-					_ => E::error().message("value is not a pointer")
-						.label(scene.value[*node].span.label())
+					other => E::error().message("expected pointer")
+						.label(scene.value[*node].span.label().message(other))
 						.result(scene.scope).ok()?,
 				},
 			}
@@ -315,4 +336,15 @@ fn synthesized(scene: &mut Scene, index: &HIndex) -> Option<S<RType>> {
 		HNode::Unresolved(_) => return None,
 		HNode::Error(_) => return None,
 	}, span))
+}
+
+fn sequence(scene: &mut Scene, base: &HIndex)
+			-> Option<(Box<S<RType>>, Option<Target>)> {
+	Some(match synthesize(scene, base)?.node {
+		Type::Slice(target, kind) => (kind, target),
+		Type::Array(kind, _) => (kind, scene.target),
+		other => E::error().label(scene.value[*base].span.label())
+			.message(format!("expected sequence, found: {}", other))
+			.result(scene.scope).ok()?,
+	})
 }

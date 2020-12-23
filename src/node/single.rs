@@ -25,13 +25,13 @@ pub enum SNode {
 	Store(SOffset, STarget),
 	Integral(STarget, i128),
 	Let(STarget, LBinary, STarget, STarget),
-	LetIntegral(STarget, LBinary, STarget, i128),
 	Call(Option<STarget>, SReceiver, Vec<SPlace>),
 	If(STarget, SIndex, Option<SIndex>),
-	Return(SPlace),
+	Return(Option<SPlace>),
 	Loop(SIndex),
 	Continue,
 	Break,
+	Never,
 }
 
 /// Represents a movable value.

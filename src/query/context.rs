@@ -28,6 +28,7 @@ pub struct Context {
 	pub typed: Table<key::TypesFunction>,
 	pub lower: Table<key::LowFunction>,
 	pub low: Table<key::Low>,
+	pub offsets: Table<key::Offsets>,
 }
 
 impl Context {
@@ -61,6 +62,7 @@ impl Context {
 			Key::TypesFunction(key) => self.typed.errors(key),
 			Key::LowFunction(key) => self.lower.errors(key),
 			Key::Low(key) => self.low.errors(key),
+			Key::Offsets(key) => self.offsets.errors(key),
 		};
 
 		match visited.contains(&key) {
@@ -91,6 +93,7 @@ impl Context {
 			Key::TypesFunction(key) => self.typed.invalidate(key),
 			Key::LowFunction(key) => self.lower.invalidate(key),
 			Key::Low(key) => self.low.invalidate(key),
+			Key::Offsets(key) => self.offsets.invalidate(key),
 		}.iter().for_each(|key| self.invalidate(key))
 	}
 }

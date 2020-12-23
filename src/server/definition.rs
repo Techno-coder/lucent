@@ -67,7 +67,7 @@ impl<'a, 'b, 'c> ReferenceVisitor<'a, 'b, 'c> for Definitions<'a, 'b, 'c> {
 		if !self.contains(TSpan::lift(base, *span)) { return; }
 		if let Some(parameters) = parameters {
 			for (name, (span, _)) in parameters {
-				if &Variable(name.clone(), 0) == variable {
+				if &Variable::parameter(name.clone()) == variable {
 					self.location(TSpan::lift(base, *span));
 				}
 			}
@@ -85,11 +85,12 @@ impl<'a, 'b, 'c> ReferenceVisitor<'a, 'b, 'c> for Definitions<'a, 'b, 'c> {
 	fn field(&mut self, base: &TSpan, structure: &Arc<Path>,
 			 name: &Identifier, span: &ISpan) {
 		if !self.contains(TSpan::lift(base, *span)) { return; }
-		let data = crate::parse::structure(self.scope, structure);
-		if let Some((span, _)) = data.unwrap().fields.get(name) {
-			let symbol = Symbol::Structure(structure.clone());
-			let target = ESpan::Item(symbol, *span).lift(self.scope);
-			self.location(target);
+		if let Ok(data) = crate::parse::structure(self.scope, structure) {
+			if let Some((span, _)) = data.fields.get(name) {
+				let symbol = Symbol::Structure(structure.clone());
+				let target = ESpan::Item(symbol, *span).lift(self.scope);
+				self.location(target);
+			}
 		}
 	}
 

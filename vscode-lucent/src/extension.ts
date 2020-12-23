@@ -21,7 +21,7 @@ export function activate(_context: ExtensionContext) {
 
     let client = new LanguageClient(
         'lucent-server',
-        'Lucent Language Server',
+        'Lucent',
         serverOptions,
         clientOptions,
     );

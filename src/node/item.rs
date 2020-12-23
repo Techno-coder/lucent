@@ -68,6 +68,12 @@ pub enum Symbol {
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Variable(pub Identifier, pub usize);
 
+impl Variable {
+	pub fn parameter(name: Identifier) -> Self {
+		Variable(name, 0)
+	}
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Sign {
 	Unsigned,
@@ -83,36 +89,45 @@ impl fmt::Display for Sign {
 	}
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Unary {
-	Not,
-	Negate,
-	Reference,
-	Dereference,
-}
-
 /// The size of a value in bytes.
 #[derive(Debug, Copy, Clone)]
 pub struct Size(pub usize);
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Width {
-	/// Byte (1 byte or 8 bits)
-	B = 1,
-	/// Word (2 bytes or 16 bits)
-	W = 2,
-	/// Double (4 bytes or 32 bits)
-	D = 4,
-	/// Quad (8 bytes or 64 bits)
-	Q = 8,
+impl Size {
+	pub fn zero(&self) -> bool {
+		matches!(self, Size(0))
+	}
+}
+
+macro_rules! width {
+    ($($name:ident: $bytes:expr;)*) => {
+		#[derive(Debug, Copy, Clone, PartialEq)]
+		pub enum Width { $($name = $bytes,)* }
+
+		impl Width {
+			pub const fn new(bytes: usize) -> Option<Self> {
+				Some(match bytes {
+					$($bytes => Width::$name,)*
+					_ => return None,
+				})
+			}
+		}
+    };
+}
+
+width! {
+	B: 1;
+	W: 2;
+	D: 4;
+	Q: 8;
 }
 
 impl Width {
-	pub fn bytes(self) -> usize {
+	pub const fn bytes(self) -> usize {
 		self as usize
 	}
 
-	pub fn bits(self) -> usize {
+	pub const fn bits(self) -> usize {
 		self.bytes() * 8
 	}
 }
@@ -131,7 +146,7 @@ pub enum LoadReference {
 }
 
 /// References the address of a function call.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Receiver<N> {
 	Path(S<FPath>),
 	Method(Convention, N),

@@ -6,5 +6,5 @@ use crate::query::QScope;
 pub fn target(_scope: QScope, _symbol: &Symbol)
 			  -> crate::Result<Option<Target>> {
 	// TODO: implement target architecture
-	Ok(None)
+	Ok(Some(Target::Host))
 }

@@ -21,7 +21,7 @@ pub fn global_annotations(scope: QScope) -> crate::Result<Arc<GlobalAnnotations>
 			let scene = &mut Scene { inclusions, values: &mut values };
 
 			let identifier = node.field(scope, "name")?;
-			let name = Identifier(node.text().into());
+			let name = Identifier(identifier.text().into());
 			let span = identifier.span();
 
 			let value = node.field(scope, "value")?;

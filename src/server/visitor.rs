@@ -22,6 +22,10 @@ pub trait ReferenceVisitor<'a: 'b, 'b: 'c, 'c> {
 	fn variable(&mut self, base: &TSpan, value: &Value,
 				parameters: Option<&HVariables>,
 				variable: &Variable, span: &ISpan);
+
+	/// Invoked on a field access or structure
+	/// creation field. Note that the referenced
+	/// structure is *not* guaranteed to exist.
 	fn field(&mut self, base: &TSpan, structure: &Arc<Path>,
 			 name: &Identifier, span: &ISpan);
 

@@ -65,8 +65,8 @@ const fn truth() -> IType {
 	IType::Type(S::new(RType::Truth, ISpan::internal()))
 }
 
-pub fn index(scene: &Scene) -> IType {
-	let kind = RType::IntegralSize(scene.target, Sign::Unsigned);
+pub fn index(target: Option<Target>) -> IType {
+	let kind = RType::IntegralSize(target, Sign::Unsigned);
 	raise(S::new(kind, ISpan::internal()))
 }
 

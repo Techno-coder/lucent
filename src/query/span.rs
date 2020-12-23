@@ -97,8 +97,8 @@ impl ESpan {
 				if let Symbol::Global(name) = symbol {
 					let table = crate::parse::global_annotations(scope).ok();
 					let annotation = table.as_ref().and_then(|table| table.get(&name));
-					let span = annotation.map(|annotation| annotation.span);
-					return span.unwrap_or_else(|| Span::internal());
+					return annotation.map(|annotation| TSpan::scope(annotation.span,
+						|base| TSpan::lift(base, span))).unwrap_or(Span::internal());
 				}
 
 				let module = match &symbol {

@@ -1,8 +1,9 @@
 use std::fmt::Debug;
 use std::hash::Hash;
+use std::sync::Arc;
 
 use crate::FilePath;
-use crate::node::{Path, VPath, FLocal};
+use crate::node::{FLocal, Path, VPath};
 
 pub trait QueryKey: Debug + Clone + Hash + Eq + PartialEq + Into<Key> {
 	type Value: Debug;
@@ -65,5 +66,7 @@ queries! {
 	Types(VPath) -> crate::inference::Types;
 	TypesFunction(FLocal) -> crate::inference::Types;
 	LowFunction(FLocal) -> crate::node::LFunction;
-	Low(VPath) -> crate::node::LNode;
+	Low(VPath) -> crate::node::LValue;
+
+	Offsets(Arc<Path>) -> crate::lower::Offsets;
 }

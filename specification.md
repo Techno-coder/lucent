@@ -82,7 +82,9 @@ never
 void
 ```
 
-Variables and expressions with the type `never` are guaranteed to be eliminated at compile time. It is the responsibility of the user to ensure no function with the `never` type returns.
+It is the responsibility of the user to ensure no function with the `never` type returns.
+
+Operations on expressions with a zero size type such as `void` and `never` are guaranteed to be eliminated during compilation. Note that it is valid to take the address of values with a zero size type. Hence, the address of a value is not guaranteed to be unique if it is adjacent to a value with a zero size type.
 
 ### Integral types
 ```
@@ -126,6 +128,16 @@ The pointer architecture can be explicitly specified by prefixing the pointer wi
 let pointer: "target" *i32
 ```
 
+If an address is taken on a temporary value it will be lifted into the enclosing scope:
+```
+function(&temporary)
+```
+This is the effectively the same as:
+```
+let value = temporary
+function(&value)
+```
+
 ### Function pointers
 ```
 fn function(argument: type) type
@@ -159,7 +171,7 @@ let variable: type = value as _
 * Reductions in width will take the lower (least significant) bits
 * Increases in width sign extend the bit representation
 
-### Integral to truth
+### [Removed] Integral to truth
 * `0` is defined as `false`
 * Any other number is defined as `true`
 
@@ -270,7 +282,7 @@ Fixed size arrays must have the number of elements in the type.
 ```
 let identifier: [type;] = array[start:end]
 ```
-Slices are constructed from slicing an array. They can also be created from a base address and size in elements:
+Slices are constructed by slicing an array. The start index must not exceed the end index. They can also be created from a base address and size:
 ```
 let identifier = [type;] address, size
 ```

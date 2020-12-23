@@ -1,12 +1,13 @@
 #![feature(option_unwrap_none)]
 #![feature(bindings_after_at)]
 #![feature(bool_to_option)]
+#![feature(const_option)]
 #![feature(box_patterns)]
 #![feature(or_patterns)]
 #![feature(once_cell)]
 
 mod node;
-// mod lower;
+mod lower;
 mod generate;
 mod compile;
 mod query;

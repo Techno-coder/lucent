@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::node::{FPath, HBinary, HDual, HIndex, HNode, RType, Sign, Unary, VPath};
+use crate::node::{FPath, HBinary, HDual, HIndex, HNode, HUnary, RType, Sign, VPath};
 use crate::query::{E, ISpan, S};
 
 use super::{IType, Scene};
@@ -36,8 +36,7 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 	let node = &scene.value[*index].node;
 	(|| Some(match (node, kind) {
 		(_, kind!(RType::Void)) => drop(super::synthesize(scene, index)),
-		(HNode::Block(nodes), IType::Type(kind)) => {
-			let (last, nodes) = nodes.split_last().unwrap();
+		(HNode::Block(box [nodes @ .., last]), IType::Type(kind)) => {
 			nodes.iter().for_each(|node| drop(super::synthesize(scene, node)));
 			check(scene, last, super::raise(kind.clone()));
 			insert(scene, kind);
@@ -62,8 +61,9 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 		}
 		(HNode::Slice(node, left, right), kind!(RType::Slice(target, box kind))) |
 		(HNode::Slice(node, left, right), IType::Sequence(target, kind)) => {
-			left.as_ref().map(|node| check(scene, node, super::TRUTH));
-			right.as_ref().map(|node| check(scene, node, super::TRUTH));
+			let index = super::index(target);
+			left.as_ref().map(|node| check(scene, node, index.clone()));
+			right.as_ref().map(|node| check(scene, node, index));
 			check(scene, node, IType::Sequence(target, kind.clone()));
 			let kind = RType::Slice(target, Box::new(kind));
 			insert(scene, S::new(kind, span));
@@ -90,7 +90,7 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 				.emit(scene.scope);
 		}
 		(HNode::Index(node, index), IType::Type(kind)) => {
-			check(scene, index, super::index(scene));
+			check(scene, index, super::index(scene.target));
 			check(scene, node, IType::Sequence(scene.target, kind.clone()));
 			insert(scene, kind);
 		}
@@ -130,13 +130,13 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 			check(scene, right, IType::Type(kind.clone()));
 			insert(scene, kind);
 		}
-		(HNode::Unary(Unary::Dereference, node), IType::Type(kind)) => {
+		(HNode::Unary(HUnary::Dereference, node), IType::Type(kind)) => {
 			let pointer = RType::Pointer(scene.target, Box::new(kind.clone()));
 			check(scene, node, IType::Type(S::new(pointer, span)));
 			insert(scene, kind);
 		}
-		(HNode::Unary(Unary::Reference, node), kind!(RType::Pointer(_, box kind))) |
-		(HNode::Unary(Unary::Not | Unary::Negate, node), IType::Type(kind)) => {
+		(HNode::Unary(HUnary::Reference, node), kind!(RType::Pointer(_, box kind))) |
+		(HNode::Unary(HUnary::Not | HUnary::Negate, node), IType::Type(kind)) => {
 			check(scene, node, IType::Type(kind.clone()));
 			insert(scene, kind);
 		}
@@ -164,6 +164,7 @@ pub fn check(scene: &mut Scene, index: &HIndex, kind: IType) {
 		(_, kind) => {
 			let target = super::synthesize(scene, index)?;
 			if !unify(&target, &kind) {
+				scene.types.nodes.remove(index).unwrap();
 				let error = conflict(kind, &target.node);
 				match target.span != scene.value[*index].span {
 					true => error.label(target.span.other()

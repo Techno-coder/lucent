@@ -58,11 +58,11 @@ impl<'a, 'b, 'c> Visitor<'a, 'b, 'c> for Diagnostics<'a, 'b, 'c> {
 	}
 
 	fn function(&mut self, _: &TSpan, path: &FLocal, _: &HFunction) {
-		let _ = crate::inference::function(self.scope(), &path);
+		let _ = crate::lower::function(self.scope(), &path);
 	}
 
 	fn value(&mut self, _: &TSpan, path: VPath, _: &Value) {
-		let _ = crate::inference::types(self.scope(), &path);
+		let _ = crate::lower::low(self.scope(), &path);
 	}
 }
 
